@@ -2,7 +2,7 @@
 'use strict';
 
 // Apps Script Web App манзили (…/exec). Бўш бўлса — кириш саҳифасида бир марта киритилади.
-const DEFAULT_API_URL = '';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzZTKSeZXjod6A5HO7_sZbSCVFVXdcHBHzaiQ0Myroc61AHtfIXZcMALa4zbLLuPdnmOg/exec';
 
 const LS = { api: 'sh_api', token: 'sh_token', cache: 'sh_cache', branch: 'sh_branch', page: 'sh_page' };
 const TZ = 'Asia/Tashkent';
