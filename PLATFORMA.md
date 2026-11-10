@@ -1,6 +1,6 @@
 # Др. Шерматов — dorixonalar tarmog'i · platforma hujjati
 
-> Holat: 10.11.2026 · Sayt: **app.js v3 / style.css v3** · Server: **Code.gs v3 (SCHEMA 3)**
+> Holat: 10.11.2026 · Sayt: **app.js v5 / style.css v5** · Server: **Code.gs v3 (SCHEMA 3)**
 > Sayt: **https://shermatovapp.vercel.app** · Baza: **«Др Шерматов аптека»** Google Sheets
 > Kod: **GitHub → `Orifbek08/shermatov.app`** (main)
 
