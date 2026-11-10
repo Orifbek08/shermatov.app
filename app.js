@@ -1,10 +1,12 @@
 /* Др. Шерматов — дорихоналар тармоғи · сайт (оддий JS, framework йўқ) */
 'use strict';
 
-// Apps Script Web App манзили (…/exec). Бўш бўлса — кириш саҳифасида бир марта киритилади.
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzZTKSeZXjod6A5HO7_sZbSCVFVXdcHBHzaiQ0Myroc61AHtfIXZcMALa4zbLLuPdnmOg/exec';
+// База: Supabase («shermatov apteka»). Калит очиқ (publishable) — жадвалларга тўғридан-тўғри кириб бўлмайди,
+// ҳамма амал фақат public.app() функцияси орқали, PIN токени билан текширилади.
+const SB_URL = 'https://hfrfskwglwnbcaymzbad.supabase.co';
+const SB_KEY = 'sb_publishable_I0CJDGavnnEzWGiTD2ri9Q_XAtDfW52';
 
-const LS = { api: 'sh_api', token: 'sh_token', cache: 'sh_cache', branch: 'sh_branch', page: 'sh_page' };
+const LS = { token: 'sh_token', cache: 'sh_cache', branch: 'sh_branch', page: 'sh_page' };
 const TZ = 'Asia/Tashkent';
 const T = { IN: 'Приход', OUT: 'Расход', TR: 'Ўтказма' };
 const CANCEL = 'Бекор';
@@ -16,6 +18,7 @@ const PAGES = [
   { id: 'stock', t: 'Қолдиқ', ic: 'box', sub: 'Ҳамма филиаллардаги қолдиқ' },
   { id: 'history', t: 'Тарих', ic: 'clock', sub: 'Ҳамма ёзувлар, қидирув ва бекор қилиш' },
   { id: 'report', t: 'Ҳисобот', ic: 'chart', sub: 'Сотув, приход ва врачлар бўйича', admin: true },
+  { id: 'settings', t: 'Созламалар', ic: 'gear', sub: 'Маҳсулотлар, нархлар, филиаллар, врачлар ва фойдаланувчилар', admin: true, noTab: true },
 ];
 
 /* ───────────── ikonkalar ───────────── */
@@ -44,11 +47,11 @@ const ICONS = {
   back: '<path d="M9 5.5h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-6-6.5z"/><path d="m12 9.5 5 5m0-5-5 5"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
   note: '<path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
+  pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
 const S = {
-  api: lsGet(LS.api) || DEFAULT_API_URL,
   token: lsGet(LS.token) || '',
   user: null, cfg: null, stock: {}, today: [], ver: -1, cfgHash: '',
   branch: '', page: lsGet(LS.page) || 'sale',
@@ -57,6 +60,7 @@ const S = {
   hist: { preset: 'today', from: '', to: '', type: '', q: '', data: null, loading: false },
   rep: { preset: 'month', from: '', to: '', data: null, loading: false },
   stockQ: '',
+  set: { tab: 'products', data: null, loading: false, q: '' },
 };
 
 /* ───────────── yordamchilar ───────────── */
@@ -105,23 +109,22 @@ function branchNames() { return (S.cfg.branches || []).map((b) => b.name); }
 /* ───────────── server ───────────── */
 
 async function api(action, data = {}) {
-  if (!S.api) throw new Error('Сервер манзили киритилмаган');
   let res;
   try {
-    res = await fetch(S.api, {
+    res = await fetch(SB_URL + '/rest/v1/rpc/app', {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({ action, t: S.token }, data)),
+      headers: { 'Content-Type': 'application/json', apikey: SB_KEY },
+      body: JSON.stringify({ req: Object.assign({ action, t: S.token }, data) }),
     });
   } catch (e) {
     setNet('off');
     throw new Error('Интернет ёки сервер билан алоқа йўқ');
   }
-  const txt = await res.text();
   let j;
-  try { j = JSON.parse(txt); } catch (e) {
+  try { j = await res.json(); } catch (e) { j = null; }
+  if (!res.ok || !j || typeof j !== 'object') {
     setNet('off');
-    throw new Error('Сервер жавоби нотўғри (Code.gs ва Deploy ни текширинг)');
+    throw new Error('Сервер жавоби нотўғри' + (j && j.message ? ': ' + j.message : ' (' + res.status + ')'));
   }
   setNet('ok');
   if (!j.ok) {
@@ -164,7 +167,7 @@ async function sync(force) {
     if (!j.same) {
       const cfgChanged = !!j.cfg;
       applyState(j);
-      if (cfgChanged) renderApp(); else softRefresh();
+      if (cfgChanged && S.page !== 'settings') renderApp(); else softRefresh();
     }
   } catch (e) { /* holat belgisi ko'rsatadi */ } finally {
     S.syncing = false; setNet(S.net);
@@ -197,16 +200,9 @@ function renderLogin(msg) {
             ? `<button type="submit" class="key go" id="login-btn" aria-label="Кириш">${ic('arrow')}</button>`
             : `<button type="button" class="key" data-k="${k}">${k}</button>`).join('')}
       </div>
-      <button class="link-btn" type="button" id="toggle-url">${ic('gear')} Сервер манзили</button>
-      <div id="url-box" class="${S.api ? 'hidden' : ''}">
-        <label class="field"><span>Apps Script Web App манзили</span>
-          <input id="api-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.api)}">
-        </label>
-      </div>
     </form>
   </div>`;
   drawDots();
-  $('#toggle-url').onclick = () => $('#url-box').classList.toggle('hidden');
   $('.pad').onclick = (e) => {
     const k = e.target.closest('[data-k]');
     if (!k) return;
@@ -230,11 +226,7 @@ function drawDots() {
 }
 
 async function doLogin() {
-  const urlIn = $('#api-url');
-  const url = urlIn ? urlIn.value.trim() : '';
-  if (url) { S.api = url; lsSet(LS.api, url); }
   const err = $('#login-err');
-  if (!S.api) { err.textContent = 'Сервер манзилини киритинг'; $('#url-box').classList.remove('hidden'); return; }
   if (!pinBuf) { err.textContent = 'PIN кодни киритинг'; return; }
   const card = $('#login-form');
   card.classList.add('busy');
@@ -254,7 +246,7 @@ async function doLogin() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (!$('#login-form') || e.target.id === 'api-url') return;
+  if (!$('#login-form')) return;
   if (/^\d$/.test(e.key)) { pinKey(e.key); e.preventDefault(); }
   else if (e.key === 'Backspace') { pinKey('back'); e.preventDefault(); }
   else if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
@@ -301,11 +293,12 @@ function renderApp() {
         <span class="mark m-only">${ic('leaf')}</span>
         <div class="ph-t"><h1 id="page-title">${pg.t}</h1><p id="page-sub">${pg.sub}</p></div>
         <div class="ph-r">${netHTML()}${brSel}
+          ${isAdmin() ? `<button class="icon-btn m-only ${S.page === 'settings' ? 'on' : ''}" data-page="settings" id="gear-m" title="Созламалар" aria-label="Созламалар">${ic('gear')}</button>` : ''}
           <button class="icon-btn m-only" id="logout-m" title="Чиқиш" aria-label="Чиқиш">${ic('logout')}</button></div>
       </header>
       <main id="view"></main>
     </div>
-    <nav class="tabbar" id="tabbar" aria-label="Бўлимлар">${navButtons(pages)}</nav>
+    <nav class="tabbar" id="tabbar" aria-label="Бўлимлар">${navButtons(pages.filter((p) => !p.noTab))}</nav>
   </div>`;
   const out = async () => { if (await confirmBox('Тизимдан чиқасизми?', 'Чиқиш')) logout(); };
   $('#logout').onclick = out;
@@ -326,6 +319,7 @@ function renderApp() {
   };
   $('#tabs').onclick = go;
   $('#tabbar').onclick = go;
+  if ($('#gear-m')) $('#gear-m').onclick = go;
   const bs = $('#branch-sel');
   if (bs) bs.onchange = () => {
     S.branch = bs.value; lsSet(LS.branch, S.branch);
@@ -338,7 +332,7 @@ function renderApp() {
 function renderView(animate) {
   const v = $('#view');
   if (!v) return;
-  const fn = { sale: viewSale, income: viewIncome, transfer: viewTransfer, stock: viewStock, history: viewHistory, report: viewReport }[S.page];
+  const fn = { sale: viewSale, income: viewIncome, transfer: viewTransfer, stock: viewStock, history: viewHistory, report: viewReport, settings: viewSettings }[S.page];
   v.innerHTML = fn ? fn() : '';
   if (animate) { v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter'); }
   if (isForm(S.page) && $('#f-total')) {
@@ -364,6 +358,7 @@ function softRefresh() {
 function after() {
   if (S.page === 'history' && !S.hist.data && !S.hist.loading) loadHistory();
   if (S.page === 'report' && !S.rep.data && !S.rep.loading) loadReport();
+  if (S.page === 'settings' && !S.set.data && !S.set.loading) loadSettings();
 }
 
 /* ───────────── filial tanlash (admin) ───────────── */
@@ -600,6 +595,7 @@ function onViewInput(e) {
   if (!isForm(kind)) {
     if (t.id === 'stock-q') { S.stockQ = t.value; filterStock(); }
     if (t.id === 'h-q') S.hist.q = t.value;
+    if (t.id === 'set-q') { S.set.q = t.value; filterSettings(); }
     return;
   }
   const f = form(kind);
@@ -700,6 +696,15 @@ async function onViewClick(e) {
   } else if (act === 'refresh') {
     b.classList.add('spinning');
     await sync(true); renderView();
+  } else if (act === 'set-tab') {
+    S.set.tab = b.dataset.tab; S.set.q = ''; renderView();
+  } else if (act === 'set-new') {
+    editItem(SET_KIND[S.set.tab], null);
+  } else if (act === 'set-edit') {
+    const list = S.set.data[S.set.tab] || [];
+    editItem(SET_KIND[S.set.tab], list.find((x) => String(x.id) === b.dataset.id));
+  } else if (act === 'set-general') {
+    saveGeneral(b);
   } else if (act === 'go-transfer') {
     S.page = 'transfer'; lsSet(LS.page, S.page);
     renderApp();
@@ -1028,6 +1033,208 @@ function repBody(d) {
     <tbody>${days.map(([dt, x]) => `<tr><td class="nw">${dLabel(dt)}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, dyMax)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
 
+/* ───────────── sozlamalar (admin) ───────────── */
+
+const SET_TABS = [['products', 'Маҳсулотлар'], ['branches', 'Филиаллар'], ['doctors', 'Врачлар'], ['users', 'Фойдаланувчилар'], ['general', 'Умумий']];
+const SET_KIND = { products: 'product', branches: 'branch', doctors: 'doctor', users: 'user' };
+
+function viewSettings() {
+  const st = S.set;
+  let body = loadingHTML;
+  if (st.error) body = `<p class="empty err">${esc(st.error)}</p>`;
+  else if (st.data && !st.loading) body = setBody();
+  return `<section class="panel">
+    <div class="toolbar">
+      <div class="seg" role="tablist">${SET_TABS.map(([k, t]) => `<button class="${st.tab === k ? 'on' : ''}" data-act="set-tab" data-tab="${k}" role="tab" aria-selected="${st.tab === k}">${t}</button>`).join('')}</div>
+      ${st.tab !== 'general' ? `<button class="btn primary sm push" data-act="set-new">${ic('plus')}Янги қўшиш</button>` : ''}
+    </div>
+    <div id="set-body">${body}</div>
+  </section>`;
+}
+
+async function loadSettings() {
+  const st = S.set;
+  st.loading = true; st.error = '';
+  try { st.data = await api('settings'); } catch (e) { st.error = e.message; }
+  st.loading = false;
+  if (S.page === 'settings') renderView();
+}
+
+function renderSetBody() {
+  const b = $('#set-body');
+  if (b && S.page === 'settings') b.innerHTML = setBody();
+}
+
+function stateTag(on) { return on ? '<span class="tag leaf">Фаол</span>' : '<span class="tag gray">Ўчирилган</span>'; }
+function editBtn(id) { return `<button class="icon-btn" data-act="set-edit" data-id="${id}" title="Таҳрирлаш" aria-label="Таҳрирлаш">${ic('pencil')}</button>`; }
+
+function setBody() {
+  const d = S.set.data;
+  const tab = S.set.tab;
+  if (tab === 'general') {
+    return `<div class="gen">
+      <label class="field"><span>Тармоқ номи (сайт тепасида кўринади)</span><input id="g-name" value="${esc(d.general.name)}"></label>
+      <label class="field"><span>Валюта</span><input id="g-cur" value="${esc(d.general.currency)}"></label>
+      <button class="btn primary" data-act="set-general">${ic('check')}Сақлаш</button>
+    </div>
+    <p class="hint soft">${ic('note')}<span>Google Sheets жадвали ҳар 6 соатда шу базадан нусха олади. Нархни, маҳсулотни ёки PIN'ни энди фақат шу саҳифада ўзгартиринг — Sheets'даги ўзгариш сайтга тушмайди.</span></p>`;
+  }
+  const search = `<div class="search set-search">${ic('search')}<input id="set-q" placeholder="Қидириш" value="${esc(S.set.q)}" aria-label="Қидириш"></div>`;
+  if (tab === 'products') {
+    const noPrice = d.products.filter((p) => p.active && !Number(p.price)).length;
+    return `${search}
+      ${noPrice ? `<p class="hint warn">${ic('alert')}<span><b>${noPrice} та</b> маҳсулотнинг нархи ёзилмаган. Нарх устунига ёзиб Enter босинг — дарҳол сақланади ва сотувда ўзи қўйилади.</span></p>` : ''}
+      <div class="tbl-wrap"><table class="tbl set" id="set-tbl"><thead><tr><th>Маҳсулот</th><th class="num">Нарх, ${esc(cur())}</th><th>Бирлик</th><th class="num">Мин. қолдиқ</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.products.map((p) => `<tr class="${p.active ? '' : 'inactive'}" data-name="${esc(p.name.toLowerCase())}">
+        <td class="b">${esc(p.name)}${p.note ? `<small>${esc(p.note)}</small>` : ''}</td>
+        <td class="num"><input class="money inline" data-price-id="${p.id}" inputmode="numeric" value="${Number(p.price) ? fmt(p.price) : ''}" placeholder="0" aria-label="${esc(p.name)} нархи"></td>
+        <td>${esc(p.unit)}</td><td class="num">${p.min}</td><td>${stateTag(p.active)}</td><td class="act">${editBtn(p.id)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (tab === 'branches') {
+    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Филиал</th><th>Манзил</th><th>Телефон</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.branches.map((b) => `<tr class="${b.active ? '' : 'inactive'}"><td class="b">${esc(b.name)}</td><td>${esc(b.addr)}</td><td class="nw">${esc(b.phone)}</td><td>${stateTag(b.active)}</td><td class="act">${editBtn(b.id)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint soft">${ic('note')}<span>Филиал номини ўзгартириш хавфсиз — эски ёзувлар ҳам янги ном билан кўринади.</span></p>`;
+  }
+  if (tab === 'doctors') {
+    return `${search}<div class="tbl-wrap"><table class="tbl set" id="set-tbl"><thead><tr><th>Врач</th><th>Изоҳ</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.doctors.map((x) => `<tr class="${x.active ? '' : 'inactive'}" data-name="${esc(x.name.toLowerCase())}"><td class="b">${esc(x.name)}</td><td class="muted">${esc(x.note)}</td><td>${stateTag(x.active)}</td><td class="act">${editBtn(x.id)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (tab === 'users') {
+    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Исм</th><th>Роль</th><th>Филиал</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.users.map((u) => `<tr class="${u.active ? '' : 'inactive'}"><td class="b">${esc(u.name)}</td><td>${u.role === 'admin' ? '<span class="tag plum">Админ</span>' : '<span class="tag sky">Сотувчи</span>'}</td><td>${esc(u.branch || '—')}</td><td>${stateTag(u.active)}</td><td class="act">${editBtn(u.id)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint soft">${ic('note')}<span>PIN ўзгартирилса, у фойдаланувчи ҳамма қурилмадан чиқиб кетади ва янги PIN билан киради. Ҳар сотувчига алоҳида PIN беринг.</span></p>`;
+  }
+  return '';
+}
+
+function filterSettings() {
+  const q = S.set.q.trim().toLowerCase();
+  document.querySelectorAll('#set-tbl tbody tr').forEach((tr) => { tr.style.display = !q || tr.dataset.name.includes(q) ? '' : 'none'; });
+}
+
+let syncTimer = 0;
+function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(() => sync(true), 700); }
+
+async function savePrice(inp) {
+  const p = S.set.data.products.find((x) => String(x.id) === inp.dataset.priceId);
+  if (!p) return;
+  const price = num(inp.value);
+  if (price === Number(p.price)) { inp.value = price ? fmt(price) : ''; return; }
+  inp.classList.add('saving');
+  try {
+    S.set.data = await api('save', { kind: 'product', item: { id: p.id, name: p.name, price, unit: p.unit, min: p.min, note: p.note, active: p.active } });
+    inp.value = price ? fmt(price) : '';
+    inp.classList.remove('saving'); inp.classList.add('saved');
+    setTimeout(() => inp.classList.remove('saved'), 1200);
+    scheduleSync();
+  } catch (e) {
+    inp.classList.remove('saving');
+    toast(e.message, 'err');
+  }
+}
+
+async function saveGeneral(btn) {
+  btn.disabled = true;
+  try {
+    S.set.data = await api('save', { kind: 'general', item: { name: $('#g-name').value, currency: $('#g-cur').value } });
+    toast('Сақланди', 'ok');
+    await sync(true);
+    renderApp();
+  } catch (e) { toast(e.message, 'err'); }
+  btn.disabled = false;
+}
+
+function editItem(kind, item) {
+  const d = S.set.data;
+  const brOpts = [['', 'Филиални танланг']].concat(d.branches.filter((b) => b.active || (item && b.name === item.branch)).map((b) => [b.name, b.name]));
+  const T = {
+    product: [item ? 'Маҳсулотни таҳрирлаш' : 'Янги маҳсулот', [
+      { key: 'name', label: 'Номи', value: item && item.name, full: true, placeholder: 'Масалан: Asal (500gr)' },
+      { key: 'price', label: `Нарх, ${cur()}`, type: 'money', value: item && Number(item.price) ? fmt(item.price) : '' },
+      { key: 'min', label: 'Минимал қолдиқ', type: 'int', value: item ? String(item.min) : '3' },
+      { key: 'unit', label: 'Бирлик', value: item ? item.unit : 'дона' },
+      { key: 'note', label: 'Изоҳ', value: item && item.note },
+      { key: 'active', label: 'Фаол — сотувда кўринади', type: 'check', value: item ? item.active : true, full: true },
+    ]],
+    branch: [item ? 'Филиални таҳрирлаш' : 'Янги филиал', [
+      { key: 'name', label: 'Номи', value: item && item.name, full: true, placeholder: 'Масалан: Чилонзор филиали' },
+      { key: 'addr', label: 'Манзил', value: item && item.addr },
+      { key: 'phone', label: 'Телефон', value: item && item.phone },
+      { key: 'active', label: 'Фаол', type: 'check', value: item ? item.active : true, full: true },
+    ]],
+    doctor: [item ? 'Врачни таҳрирлаш' : 'Янги врач', [
+      { key: 'name', label: 'Исми', value: item && item.name, full: true, placeholder: 'Масалан: Др. Каримов' },
+      { key: 'note', label: 'Изоҳ', value: item && item.note, full: true },
+      { key: 'active', label: 'Фаол — рўйхатда кўринади', type: 'check', value: item ? item.active : true, full: true },
+    ]],
+    user: [item ? 'Фойдаланувчини таҳрирлаш' : 'Янги фойдаланувчи', [
+      { key: 'name', label: 'Исми', value: item && item.name, full: true, placeholder: 'Масалан: Дилноза (1-филиал)' },
+      { key: 'role', label: 'Роль', type: 'select', value: item ? item.role : 'seller', options: [['seller', 'Сотувчи'], ['admin', 'Админ']] },
+      { key: 'branch', label: 'Филиал', type: 'select', value: item ? item.branch : '', options: brOpts },
+      { key: 'pin', label: item ? 'Янги PIN' : 'PIN', type: 'pin', value: '', placeholder: item ? 'Ўзгартирмаслик учун бўш қолдиринг' : '4–12 та рақам', full: true },
+      { key: 'active', label: 'Фаол — тизимга кира олади', type: 'check', value: item ? item.active : true, full: true },
+    ]],
+  }[kind];
+  formModal({
+    title: T[0], fields: T[1],
+    onSubmit: async (v) => {
+      if (kind === 'user' && v.role === 'admin') v.branch = '';
+      S.set.data = await api('save', { kind, item: Object.assign({ id: item ? item.id : null }, v) });
+      renderSetBody(); filterSettings();
+      toast('Сақланди', 'ok');
+      scheduleSync();
+    },
+  });
+}
+
+function fieldHTML(f) {
+  const cls = `field ${f.full ? 'full' : ''}`;
+  if (f.type === 'check') return `<label class="check ${f.full ? 'full' : ''}"><input type="checkbox" name="${f.key}" ${f.value ? 'checked' : ''}><span>${esc(f.label)}</span></label>`;
+  if (f.type === 'select') return `<label class="${cls}" data-field="${f.key}"><span>${esc(f.label)}</span><select name="${f.key}">${f.options.map(([v, t]) => `<option value="${esc(v)}" ${v === f.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+  const numeric = ['money', 'int', 'pin'].includes(f.type);
+  return `<label class="${cls}" data-field="${f.key}"><span>${esc(f.label)}</span><input name="${f.key}" value="${esc(f.value == null ? '' : f.value)}" ${numeric ? 'inputmode="numeric"' : ''} ${f.type === 'pin' ? 'type="password" autocomplete="new-password"' : 'autocomplete="off"'} placeholder="${esc(f.placeholder || '')}" class="${f.type === 'money' ? 'money' : ''}"></label>`;
+}
+
+function formModal({ title, fields, onSubmit, ok = 'Сақлаш' }) {
+  const root = $('#modal-root');
+  const prev = document.activeElement;
+  root.innerHTML = `<div class="ov"><form class="mdl wide" id="fm" role="dialog" aria-modal="true" aria-labelledby="fm-t" novalidate>
+    <h3 id="fm-t">${esc(title)}</h3>
+    <div class="fm-grid">${fields.map(fieldHTML).join('')}</div>
+    <div class="err" id="fm-err" role="alert"></div>
+    <div class="mdl-f"><button type="button" class="btn soft" id="fm-no">Ортга</button><button class="btn primary" type="submit" id="fm-ok">${ic('check')}${esc(ok)}</button></div>
+  </form></div>`;
+  const form = $('#fm');
+  const close = () => {
+    document.removeEventListener('keydown', key);
+    const ov = $('.ov'); if (ov) ov.classList.add('out');
+    setTimeout(() => { root.innerHTML = ''; if (prev && prev.focus) prev.focus(); }, 140);
+  };
+  const key = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', key);
+  $('#fm-no').onclick = close;
+  $('.ov').onclick = (e) => { if (e.target.classList.contains('ov')) close(); };
+  const roleSel = form.querySelector('select[name="role"]');
+  const syncRole = () => { const br = form.querySelector('[data-field="branch"]'); if (br) br.classList.toggle('hidden', roleSel.value === 'admin'); };
+  if (roleSel) { roleSel.onchange = syncRole; syncRole(); }
+  form.querySelectorAll('input.money').forEach((i) => i.addEventListener('blur', () => { if (i.value) i.value = fmt(num(i.value)); }));
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const v = {};
+    fields.forEach((f) => {
+      const el = form.elements[f.key];
+      if (f.type === 'check') v[f.key] = el.checked;
+      else if (f.type === 'money' || f.type === 'int') v[f.key] = String(num(el.value));
+      else v[f.key] = el.value.trim();
+    });
+    const btn = $('#fm-ok');
+    btn.disabled = true; $('#fm-err').textContent = '';
+    try { await onSubmit(v); close(); } catch (err) { $('#fm-err').textContent = err.message; btn.disabled = false; }
+  };
+  const first = form.querySelector('input, select');
+  if (first) first.focus();
+}
+
 /* ───────────── modal / toast ───────────── */
 
 function modal({ title, body, input, ok = 'Ҳа', cancel = 'Ортга', danger }) {
@@ -1073,7 +1280,10 @@ function toast(text, kind) {
 function start() {
   const view = document.getElementById('app');
   view.addEventListener('input', (e) => { if (e.target.tagName !== 'SELECT') onViewInput(e); });
-  view.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' && e.target.id !== 'branch-sel') onViewInput(e); });
+  view.addEventListener('change', (e) => {
+    if (e.target.dataset && e.target.dataset.priceId) return savePrice(e.target);
+    if (e.target.tagName === 'SELECT' && e.target.id !== 'branch-sel') onViewInput(e);
+  });
   view.addEventListener('focusout', onViewBlur);
   view.addEventListener('click', onViewClick);
 
@@ -1099,9 +1309,9 @@ function start() {
     renderLogin();
   }
 
-  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 45000);
+  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 15000);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && Date.now() - S.lastSync > 10000) sync();
+    if (document.visibilityState === 'visible' && Date.now() - S.lastSync > 5000) sync();
   });
   window.addEventListener('online', () => sync());
 }

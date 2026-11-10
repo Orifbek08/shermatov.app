@@ -180,6 +180,8 @@ input[type="date"] { width: auto; }
 .hint { display: flex; gap: 10px; align-items: flex-start; background: var(--leaf-soft); color: var(--forest); padding: 12px 14px; border-radius: var(--r-sm); font-size: 14px; margin: 0 0 20px; }
 .hint .ic { width: 18px; height: 18px; color: var(--leaf); margin-top: 1px; }
 .hint.soft { background: var(--field); }
+.hint.warn { background: var(--honey-soft); color: #5f4310; }
+.hint.warn .ic { color: var(--honey-d); }
 #to-hint { margin: 14px 0 0; }
 #to-hint:empty { display: none; }
 
@@ -424,6 +426,26 @@ input[type="date"] { width: auto; }
 .toast.err .ic { color: #ffc9c4; }
 .toast.out { opacity: 0; transform: translateY(-8px); }
 
+
+/* sozlamalar */
+.set-search { flex: 0 1 340px; margin-bottom: 14px; }
+.tbl.set td { vertical-align: middle; }
+.tbl.set td.act { width: 52px; text-align: right; padding: 6px 10px; }
+.tbl.set tr.inactive td { color: #9aaba3; }
+.tbl.set tr.inactive td.b { text-decoration: line-through; }
+.tbl.set td small { font-weight: 400; }
+input.inline { height: 38px; width: 132px; padding: 0 12px; background: var(--field); }
+input.inline.saving { opacity: .6; }
+input.inline.saved { border-color: var(--leaf); background: var(--leaf-soft); }
+.tag.gray { background: var(--line-2); color: var(--muted); }
+.icon-btn.on { background: var(--leaf-soft); color: var(--leaf-d); }
+.gen { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 14px; align-items: end; max-width: 820px; margin-bottom: 20px; }
+.mdl.wide { width: min(580px, 100%); }
+.fm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 6px 0 4px; }
+.fm-grid .full { grid-column: 1 / -1; }
+.check { display: flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 500; color: var(--ink); cursor: pointer; padding: 4px 0; }
+.check input { width: 20px; height: 20px; accent-color: var(--leaf); }
+
 /* pastki menyu (telefon) */
 .tabbar { display: none; }
 
@@ -501,6 +523,11 @@ input[type="date"] { width: auto; }
   .low li { grid-template-columns: 1fr auto; }
   .low .donor { grid-column: 1 / -1; text-align: left; margin-top: -6px; }
   #toasts { top: 10px; }
+  .fm-grid { grid-template-columns: 1fr; }
+  .gen { grid-template-columns: 1fr; }
+  .set-search { flex: 1 1 100%; }
+  .toolbar .seg { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .toolbar .seg button { white-space: nowrap; }
 
   .login { grid-template-columns: 1fr; }
   .login-art { display: none; }
