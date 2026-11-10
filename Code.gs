@@ -6,6 +6,8 @@
  * Eski ma'lumot o'chirilmaydi, faqat yetishmagan varaq/ustun qo'shiladi.
  */
 
+// Baza: «Др Шерматов аптека» — https://docs.google.com/spreadsheets/d/1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI
+const SPREADSHEET_ID = '1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI';
 const VERSION = '1';
 const SCHEMA = '1';
 const TZ = 'Asia/Tashkent';
@@ -131,7 +133,8 @@ function handle_(req) {
 
 function ss_() {
   const a = SpreadsheetApp.getActiveSpreadsheet();
-  if (a) return a;
+  if (a && (!SPREADSHEET_ID || a.getId() === SPREADSHEET_ID)) return a;
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
   const p = PropertiesService.getScriptProperties();
   const id = p.getProperty('ssId');
   if (id) {
