@@ -8,8 +8,8 @@
 
 // Baza: «Др Шерматов аптека» — https://docs.google.com/spreadsheets/d/1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI
 const SPREADSHEET_ID = '1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI';
-const VERSION = '2';
-const SCHEMA = '2';
+const VERSION = '3';
+const SCHEMA = '3';
 const TZ = 'Asia/Tashkent';
 
 const SH = {
@@ -33,12 +33,92 @@ const PREFIX = { 'Приход': 'П', 'Расход': 'С', 'Ўтказма': '
 const ST = { OK: 'Фаол', CANCEL: 'Бекор' };
 
 const PROD_COLS = ['Маҳсулот', 'Нарх', 'Бирлик', 'Минимал қолдиқ', 'Изоҳ'];
+// Birinchi versiyadagi namuna mahsulotlar — jadvalda faqat shular bo'lsa, yangi ro'yxat bilan almashtiriladi
+const OLD_DEMO = ['Омега-3 1000 мг (60 капсула)', 'Витамин D3 2000 МЕ (60 таблетка)', 'Магний B6 (50 таблетка)',
+  'Цинк + Витамин C (30 таблетка)', 'Коллаген + Гиалурон кислота (30 саше)'];
+// Mahsulotlar ro'yxati (Jadval.xlsx dan). Narxlarni «Маҳсулотлар» varag'ida yozasiz.
 const PROD_SEED = [
-  ['Омега-3 1000 мг (60 капсула)', 85000, 'дона', 5, 'БАД'],
-  ['Витамин D3 2000 МЕ (60 таблетка)', 65000, 'дона', 5, 'БАД'],
-  ['Магний B6 (50 таблетка)', 55000, 'дона', 5, 'БАД'],
-  ['Цинк + Витамин C (30 таблетка)', 45000, 'дона', 5, 'БАД'],
-  ['Коллаген + Гиалурон кислота (30 саше)', 120000, 'дона', 3, 'БАД'],
+  ["Achiq Bodom yog'i (100ml)", '', 'дона', 3, ''],
+  ["Aminamaks (250ml)", '', 'дона', 3, ''],
+  ["Artishok (60kapsula)", '', 'дона', 3, ''],
+  ["Asali Aralashma (100gr)", '', 'дона', 3, ''],
+  ["Asal (500gr)", '', 'дона', 3, ''],
+  ["Ashvagandha (60tabletka)", '', 'дона', 3, ''],
+  ["Bodom (200gr)", '', 'дона', 3, ''],
+  ["Bakteriya (100ml)", '', 'дона', 3, ''],
+  ["bonka 01 (5 dona)", '', 'дона', 3, ''],
+  ["bonka 02 (5 dona)", '', 'дона', 3, ''],
+  ["bonka 03 (5 dona)", '', 'дона', 3, ''],
+  ["bonka 04 (5 dona)", '', 'дона', 3, ''],
+  ["bonka 05 (5 dona)", '', 'дона', 3, ''],
+  ["Chernika (40kapsula)", '', 'дона', 3, ''],
+  ["Diab-As choy (25paketcha)", '', 'дона', 3, ''],
+  ["DIA BOS (2 tasi 1)", '', 'дона', 3, ''],
+  ["Dolchin Karitsa (100gr)", '', 'дона', 3, ''],
+  ["Diab-As (250ml)", '', 'дона', 3, ''],
+  ["Femiseyf Malham (200ml)", '', 'дона', 3, ''],
+  ["Femiseyf Malham (3 tasi 1)", '', 'дона', 3, ''],
+  ["Fito-Svechi ko'k (10 dona)", '', 'дона', 3, ''],
+  ["Fito-Svechi qizil (10 dona)", '', 'дона', 3, ''],
+  ["Gastromukotib (120kapsula)", '', 'дона', 3, ''],
+  ["Gelmin-AS (30kapsula)", '', 'дона', 3, ''],
+  ["Gepanormin (3 tasi 1)", '', 'дона', 3, ''],
+  ["Grelka Qimmati (1 dona)", '', 'дона', 3, ''],
+  ["Imber (100gr)", '', 'дона', 3, ''],
+  ["Kardamon sirop 250ml", '', 'дона', 3, ''],
+  ["Imunas Qon kopaytuvchi (250ml)", '', 'дона', 3, ''],
+  ["Imuset malham CORECLEAN (3 tasi 1)", '', 'дона', 3, ''],
+  ["Kardamon (30kapsula)", '', 'дона', 3, ''],
+  ["Kardamon kompekt (3 tasi 1)", '', 'дона', 3, ''],
+  ["Kavrak (90kapsula)", '', 'дона', 3, ''],
+  ["KistiyAl Hindiy (120tabletka)", '', 'дона', 3, ''],
+  ["KistiyAl Hindiy (90kapsula)", '', 'дона', 3, ''],
+  ["Keshu (250gr)", '', 'дона', 3, ''],
+  ["Kurkuma maydalangani (100gr)", '', 'дона', 3, ''],
+  ["Listitin (40 dona)", '', 'дона', 3, ''],
+  ["Mo'miyo", '', 'дона', 3, ''],
+  ["Macun (240gr)", '', 'дона', 3, ''],
+  ["Magniy Sulfat (25gr)", '', 'дона', 3, ''],
+  ["Murch (25gr)", '', 'дона', 3, ''],
+  ["Nevrasan sirop (250ml)", '', 'дона', 3, ''],
+  ["Nevrason malham (15paketcha)", '', 'дона', 3, ''],
+  ["Normi-AS kardamon (15paketcha)", '', 'дона', 3, ''],
+  ["Olma sirkasi (300ml)", '', 'дона', 3, ''],
+  ["Oq Yong'oq (500gr)", '', 'дона', 3, ''],
+  ["Qora Yong'oq (330gr)", '', 'дона', 3, ''],
+  ["Qora Yong'oq (500gr)", '', 'дона', 3, ''],
+  ["Parafin (1kg)", '', 'дона', 3, ''],
+  ["Pista (250gr)", '', 'дона', 3, ''],
+  ["Pipetka plastik (1 dona)", '', 'дона', 3, ''],
+  ["Pistalet Nasos (1 dona)", '', 'дона', 3, ''],
+  ["Propilis Kichkinasi (100ml)", '', 'дона', 3, ''],
+  ["Propolis sirob (250ml)", '', 'дона', 3, ''],
+  ["Prostina Masaj (1 dona)", '', 'дона', 3, ''],
+  ["Prostina Qimmat Komplek (1komplekt)", '', 'дона', 3, ''],
+  ["Prostina Toliq Masaj (1komplekt)", '', 'дона', 3, ''],
+  ["Po'takan (20gr)", '', 'дона', 3, ''],
+  ["Rastaropsha choy (25 paketcha)", '', 'дона', 3, ''],
+  ["Rastaropsha ekstra (90kapsula)", '', 'дона', 3, ''],
+  ["Rastaropsha malham (60kapsula)", '', 'дона', 3, ''],
+  ["Rastaropsha yog'i (250ml)", '', 'дона', 3, ''],
+  ["Sano choy (100gr)", '', 'дона', 3, ''],
+  ["Soda (100ml)", '', 'дона', 3, ''],
+  ["Sprulina (150tabletka)", '', 'дона', 3, ''],
+  ["Suyuq kalsiy (50 dona)", '', 'дона', 3, ''],
+  ["tulki moyak (1 dona)", '', 'дона', 3, ''],
+  ["tapichka (1 para)", '', 'дона', 3, ''],
+  ["Traviy 014 (30paketchalik)", '', 'дона', 3, ''],
+  ["Traviy 15 (30paketchalik)", '', 'дона', 3, ''],
+  ["Traviy 05 (30paketchalik)", '', 'дона', 3, ''],
+  ["Velmibon (tab) (30kapsula)", '', 'дона', 3, ''],
+  ["Vertebr-AS (250ml)", '', 'дона', 3, ''],
+  ["Vitamin D3 (120tabletka)", '', 'дона', 3, ''],
+  ["Vitamin kompleks (60kapsula)", '', 'дона', 3, ''],
+  ["Vodorod pereksidi (100ml)", '', 'дона', 3, ''],
+  ["Yoda Selen (60tabletka)", '', 'дона', 3, ''],
+  ["Zaytun kichkina masaj uchun (100ml)", '', 'дона', 3, ''],
+  ["Selen zink shimiladigan (40 tabletka)", '', 'дона', 3, ''],
+  ["Zaytun olifkoy maslo (250ml)", '', 'дона', 3, ''],
 ];
 const BR_COLS = ['Филиал', 'Манзил', 'Телефон'];
 const BR_SEED = [['1-филиал', '', ''], ['2-филиал', '', ''], ['3-филиал', '', ''], ['4-филиал', '', ''], ['5-филиал', '', '']];
@@ -162,6 +242,7 @@ function ensure_(ss, force) {
 
     sheet_(ss, SH.STOCK, ['Маҳсулот'], null, '#0f766e');
     const prod = sheet_(ss, SH.PROD, PROD_COLS, PROD_SEED, '#334155');
+    migrateProducts_(prod);
     prod.getRange('B:B').setNumberFormat('#,##0');
     widths_(prod, [300, 100, 70, 120, 200]);
     widths_(sheet_(ss, SH.BR, BR_COLS, BR_SEED, '#334155'), [160, 260, 140]);
@@ -215,6 +296,16 @@ function sheet_(ss, name, headers, seed, color) {
   sh.getRange(1, 1, 1, w).setFontWeight('bold').setFontColor('#ffffff').setBackground(color || '#334155');
   sh.setFrozenRows(1);
   return sh;
+}
+
+/** Jadvalda hali faqat birinchi versiyadagi 5 ta namuna mahsulot bo'lsa — haqiqiy ro'yxat bilan almashtirish. */
+function migrateProducts_(sh) {
+  const n = sh.getLastRow();
+  if (n < 2) return;
+  const names = sh.getRange(2, 1, n - 1, 1).getValues().map(function (r) { return clean_(r[0]); }).filter(String);
+  if (!names.length || !names.every(function (x) { return OLD_DEMO.indexOf(x) >= 0; })) return;
+  sh.getRange(2, 1, n - 1, Math.max(PROD_COLS.length, sh.getLastColumn())).clearContent();
+  sh.getRange(2, 1, PROD_SEED.length, PROD_SEED[0].length).setValues(PROD_SEED);
 }
 
 function widths_(sh, ws) {
@@ -525,7 +616,7 @@ function branchOk_(cfg, b) {
 
 function normItems_(cfg, items, withPrice) {
   if (!Array.isArray(items) || !items.length) fail_('Камида битта маҳсулот қўшинг');
-  if (items.length > 50) fail_('Битта ҳужжатда кўпи билан 50 қатор');
+  if (items.length > 200) fail_('Битта ҳужжатда кўпи билан 200 қатор');
   return items.map(function (it, i) {
     const name = clean_(it.product);
     const p = cfg.products.filter(function (x) { return x.name === name; })[0];

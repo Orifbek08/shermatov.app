@@ -254,6 +254,8 @@ function softRefresh() {
   if (['sale', 'income', 'transfer'].includes(S.page)) {
     const side = $('#side');
     if (side) side.innerHTML = sideHTML(S.page);
+    const dl = $('#dl-products');
+    if (dl) dl.innerHTML = prodOptions();
     document.querySelectorAll('[data-stockbadge]').forEach((el) => {
       const i = Number(el.dataset.stockbadge);
       updateLineMeta(S.page, i);
@@ -281,7 +283,7 @@ function needBranch(title) {
 
 /* ───────────── formalar: sotuv / prixod / o'tkazma ───────────── */
 
-function newLine() { return { product: '', qty: '1', price: '', sum: '', manual: false }; }
+function newLine() { return { product: '', text: '', qty: '1', price: '', sum: '', manual: false }; }
 function form(id) {
   if (!S.forms[id]) S.forms[id] = { lines: [newLine()], client: '', doctor: '', note: '', to: '', rid: uid(), busy: false };
   return S.forms[id];
@@ -290,23 +292,29 @@ function form(id) {
 function linesHTML(kind) {
   const f = form(kind);
   const sale = kind === 'sale';
-  const prods = S.cfg.products || [];
   const head = `<div class="line head ${sale ? 'sale' : ''}">
       <span>Маҳсулот</span><span>Қолдиқ</span><span>Сони</span>${sale ? '<span>Нарх</span><span>Сумма</span>' : ''}<span></span></div>`;
   const rows = f.lines.map((l, i) => `
     <div class="line ${sale ? 'sale' : ''}" data-line="${i}">
-      <select data-f="product" data-i="${i}" aria-label="Маҳсулот">
-        <option value="">— маҳсулотни танланг —</option>
-        ${prods.map((p) => `<option ${p.name === l.product ? 'selected' : ''} value="${esc(p.name)}">${esc(p.name)} · ${stockOf(S.branch, p.name)}</option>`).join('')}
-      </select>
+      <input data-f="product" data-i="${i}" list="dl-products" value="${esc(l.product || l.text)}" placeholder="🔍 маҳсулот номини ёзинг" autocomplete="off" aria-label="Маҳсулот" class="prod-in">
       <span class="stock-b" data-stockbadge="${i}"></span>
       <input data-f="qty" data-i="${i}" inputmode="numeric" value="${esc(l.qty)}" aria-label="Сони" placeholder="Сони">
       ${sale ? `<input data-f="price" data-i="${i}" inputmode="numeric" value="${l.price === '' ? '' : fmt(l.price)}" aria-label="Нарх" placeholder="Нарх">
       <input data-f="sum" data-i="${i}" inputmode="numeric" value="${l.sum === '' ? '' : fmt(l.sum)}" aria-label="Сумма" placeholder="Сумма" class="${l.manual ? 'manual' : ''}">` : ''}
       <button class="x" data-act="del-line" data-i="${i}" title="Ўчириш" aria-label="Қаторни ўчириш">×</button>
     </div>`).join('');
-  return `<div class="lines" id="lines">${head}${rows}</div>
+  return `<div class="lines" id="lines">${head}${rows}<datalist id="dl-products">${prodOptions()}</datalist></div>
     <button class="btn ghost" data-act="add-line">+ Маҳсулот қўшиш</button>`;
+}
+
+function prodOptions() {
+  return (S.cfg.products || []).map((p) => `<option value="${esc(p.name)}">${S.branch ? 'қолдиқ: ' + stockOf(S.branch, p.name) : ''}</option>`).join('');
+}
+
+function findProduct(text) {
+  const v = String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!v) return null;
+  return (S.cfg.products || []).find((p) => p.name.toLowerCase() === v) || null;
 }
 
 function updateLineMeta(kind, i) {
@@ -496,9 +504,13 @@ function onViewInput(e) {
   if (!l || !t.dataset.f) return;
   const fld = t.dataset.f;
   if (fld === 'product') {
-    l.product = t.value;
-    const p = product(l.product);
-    l.price = p ? p.price : '';
+    l.text = t.value;
+    const p = findProduct(t.value);
+    const name = p ? p.name : '';
+    t.classList.remove('bad');
+    if (name === l.product) return;
+    l.product = name;
+    l.price = p && p.price ? p.price : '';
     l.manual = false;
     l.sum = l.price === '' ? '' : num(l.qty) * num(l.price);
     const row = t.closest('.line');
@@ -506,6 +518,7 @@ function onViewInput(e) {
       row.querySelector('[data-f="price"]').value = l.price === '' ? '' : fmt(l.price);
       const s = row.querySelector('[data-f="sum"]'); s.value = l.sum === '' ? '' : fmt(l.sum); s.classList.remove('manual');
     }
+    updateTotals(kind);
     f.lines.forEach((_, j) => updateLineMeta(kind, j));
     if (kind === 'transfer') { const h = $('#to-hint'); if (h) h.innerHTML = toHint(); }
   } else if (fld === 'qty' || fld === 'price') {
@@ -526,6 +539,11 @@ function onViewInput(e) {
 
 function onViewBlur(e) {
   const t = e.target;
+  if (t.dataset && t.dataset.f === 'product' && ['sale', 'income', 'transfer'].includes(S.page)) {
+    const l = form(S.page).lines[Number(t.dataset.i)];
+    if (l && l.product) t.value = l.product;
+    else if (t.value.trim()) t.classList.add('bad');
+  }
   if (t.dataset && (t.dataset.f === 'price' || t.dataset.f === 'sum') && t.value !== '') t.value = fmt(num(t.value));
 }
 
@@ -541,8 +559,8 @@ async function onViewClick(e) {
   } else if (act === 'add-line') {
     form(kind).lines.push(newLine());
     rerenderLines(kind);
-    const sels = document.querySelectorAll('#lines select');
-    if (sels.length) sels[sels.length - 1].focus();
+    const ins = document.querySelectorAll('#lines .prod-in');
+    if (ins.length) ins[ins.length - 1].focus();
   } else if (act === 'del-line') {
     const f = form(kind);
     f.lines.splice(Number(b.dataset.i), 1);
@@ -585,12 +603,16 @@ function rerenderLines(kind) {
 async function submit(kind) {
   const f = form(kind);
   if (f.busy) return;
+  const lost = f.lines.find((l) => !l.product && String(l.text || '').trim());
+  if (lost) return toast(`«${lost.text.trim()}» — бундай маҳсулот йўқ. Рўйхатдан танланг`, 'err');
   const lines = f.lines.filter((l) => l.product);
   if (!lines.length) return toast('Камида битта маҳсулот танланг', 'err');
   for (const l of lines) if (!(num(l.qty) > 0)) return toast(`«${l.product}»: сонини ёзинг`, 'err');
   const payload = { branch: S.branch, note: f.note, rid: f.rid };
   if (kind === 'sale') {
     if (!f.client.trim()) { toast('Мижоз Ф.И.Ш ни ёзинг', 'err'); const c = $('#f-client'); if (c) c.focus(); return; }
+    const free = lines.find((l) => !(num(l.sum) > 0));
+    if (free) return toast(`«${free.product}»: нарх ёки суммани ёзинг`, 'err');
     payload.client = f.client; payload.doctor = f.doctor;
     payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty), price: num(l.price), sum: num(l.sum) }));
   } else {
@@ -618,7 +640,7 @@ async function submit(kind) {
     toast(`${label}: ${j.doc}${kind === 'sale' && j.total != null ? ' · ' + money(j.total) : ''}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
     S.hist.data = null; S.rep.data = null;
     renderView();
-    const first = document.querySelector(kind === 'sale' ? '#f-client' : '#lines select');
+    const first = document.querySelector(kind === 'sale' ? '#f-client' : '#lines .prod-in');
     if (first) first.focus();
   } catch (err) {
     f.busy = false; setSubmitBusy(kind, false);
@@ -658,21 +680,24 @@ function viewStock() {
   const me = S.branch;
   const scope = me ? [me] : brs;
   const low = [];
+  // ҳали ҳеч қачон келмаган (ҳамма филиалда 0) маҳсулотлар рўйхатни тўлдириб юбормаслиги учун фақат бор бўлганлари
   prods.forEach((p) => scope.forEach((b) => {
     const q = stockOf(b, p.name);
+    if (!brs.some((x) => stockOf(x, p.name) > 0) && q === 0) return;
     if (q <= p.min) {
       const donor = brs.filter((x) => x !== b).map((x) => [x, stockOf(x, p.name)]).sort((a, c) => c[1] - a[1])[0];
       low.push({ b, p, q, donor: donor && donor[1] > p.min ? donor : null });
     }
   }));
+  low.sort((a, c) => a.q - c.q);
   const totals = brs.map((b) => prods.reduce((a, p) => a + stockOf(b, p.name), 0));
   return `
-  ${low.length ? `<section class="card warn">
-    <h3>⚠ Кам қолган маҳсулотлар${me ? ' · ' + esc(me) : ''}</h3>
+  ${low.length ? `<section class="card warn"><details ${low.length <= 8 ? 'open' : ''}>
+    <summary><h3>⚠ Кам қолган маҳсулотлар${me ? ' · ' + esc(me) : ''}: ${low.length} та</h3></summary>
     <ul class="low">${low.map((x) => `<li><span><b>${esc(x.p.name)}</b>${me ? '' : ' — ' + esc(x.b)}: <b class="${x.q <= 0 ? 'red' : 'amber'}">${x.q}</b> ${esc(x.p.unit)} <span class="muted">(минимал ${x.p.min})</span></span>
       ${x.donor ? `<span class="muted">«${esc(x.donor[0])}»да ${x.donor[1]} бор</span>` : ''}</li>`).join('')}</ul>
     ${me ? '<button class="btn ghost sm" data-act="go-transfer">🔁 Ўтказма қилиш</button>' : ''}
-  </section>` : ''}
+  </details></section>` : ''}
   <section class="card">
     <div class="card-h"><h2>📦 Қолдиқ <small>· ҳамма филиаллар</small></h2>
       <div class="h-tools"><input id="stock-q" placeholder="🔍 Маҳсулот қидириш" value="${esc(S.stockQ)}"><button class="btn ghost sm" data-act="refresh">↻ Янгилаш</button></div></div>
@@ -680,7 +705,7 @@ function viewStock() {
       <thead><tr><th class="sticky">Маҳсулот</th>${brs.map((b) => `<th class="num ${b === me ? 'me' : ''}">${esc(b)}</th>`).join('')}<th class="num">Жами</th><th class="num">Мин.</th></tr></thead>
       <tbody>${prods.map((p) => {
         const qs = brs.map((b) => stockOf(b, p.name));
-        return `<tr data-name="${esc(p.name.toLowerCase())}"><td class="sticky">${esc(p.name)}<div class="muted sm">${fmt(p.price)} ${cur()}</div></td>
+        return `<tr data-name="${esc(p.name.toLowerCase())}"><td class="sticky">${esc(p.name)}${p.price ? `<div class="muted sm">${fmt(p.price)} ${cur()}</div>` : ''}</td>
           ${qs.map((q, i) => `<td class="num ${brs[i] === me ? 'me' : ''} ${q <= 0 ? 'zero' : q <= p.min ? 'lowc' : ''}">${fmt(q)}</td>`).join('')}
           <td class="num b">${fmt(qs.reduce((a, c) => a + c, 0))}</td><td class="num muted">${p.min}</td></tr>`;
       }).join('')}</tbody>

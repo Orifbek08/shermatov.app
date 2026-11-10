@@ -129,6 +129,8 @@ main { padding: 18px; max-width: 1400px; margin: 0 auto; }
 .line.head { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
 .line input { text-align: right; padding: 10px; }
 .line input.manual { background: var(--amber-soft); }
+.line input.prod-in { text-align: left; }
+.line input.bad { border-color: var(--red); background: var(--red-soft); }
 .stock-b { font-size: .82rem; font-weight: 650; color: #047857; background: #ecfdf5; border-radius: 8px; padding: 6px 8px; text-align: center; white-space: nowrap; }
 .stock-b:empty { background: none; }
 .stock-b.low { color: var(--amber); background: var(--amber-soft); }
@@ -194,7 +196,12 @@ main { padding: 18px; max-width: 1400px; margin: 0 auto; }
 
 /* kam qolganlar */
 .card.warn { border-color: #fde68a; background: #fffbeb; }
-.low { list-style: none; margin: 0 0 12px; padding: 0; }
+.low { list-style: none; margin: 0 0 12px; padding: 0; max-height: 320px; overflow: auto; }
+.warn summary { cursor: pointer; list-style: none; }
+.warn summary::-webkit-details-marker { display: none; }
+.warn summary h3 { display: inline; margin: 0; }
+.warn summary::after { content: ' ▾'; color: var(--amber); }
+.warn details[open] summary { margin-bottom: 10px; }
 .low li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed #fde68a; font-size: .9rem; flex-wrap: wrap; }
 
 /* filtrlar, KPI */
@@ -244,7 +251,7 @@ main { padding: 18px; max-width: 1400px; margin: 0 auto; }
   .row2, .row2.tr { grid-template-columns: 1fr; gap: 0; }
   .arrow { display: none; }
   .line, .line.sale { grid-template-columns: 1fr 1fr 1fr 32px; background: var(--soft); padding: 8px; border-radius: 12px; }
-  .line select { grid-column: 1 / -1; }
+  .line select, .line .prod-in { grid-column: 1 / -1; }
   .line.sale .stock-b { grid-column: 1 / 2; }
   .line.sale input[data-f="qty"] { grid-column: 2 / 3; }
   .line.sale input[data-f="price"] { grid-column: 3 / 5; }

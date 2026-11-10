@@ -1,6 +1,6 @@
 # Др. Шерматов — dorixonalar tarmog'i · platforma hujjati
 
-> Holat: 10.11.2026 · Sayt: **app.js v1 / style.css v1** · Server: **Code.gs v2 (SCHEMA 2)**
+> Holat: 10.11.2026 · Sayt: **app.js v3 / style.css v3** · Server: **Code.gs v3 (SCHEMA 3)**
 > Sayt: **https://shermatovapp.vercel.app** · Baza: **«Др Шерматов аптека»** Google Sheets
 > Kod: **GitHub → `Orifbek08/shermatov.app`** (main)
 
@@ -39,7 +39,7 @@ Oddiy HTML/CSS/JS — framework, build yoki `npm` kerak emas.
    *Execute as:* **Me**, *Who has access:* **Anyone** → **Deploy** → Google ruxsat so'raydi → **Allow**.
 4. Berilgan **Web app URL**ni (`https://script.google.com/macros/s/…/exec`) nusxalang.
 5. Shu manzilni brauzerda oching → `{"ok":true,"app":"shermatov","v":"1"}` chiqadi.
-   **Shu paytda jadvalning hamma varaqlari o'zi yaratiladi** (5 ta BAD mahsulot, 5 ta filial, foydalanuvchilar bilan).
+   **Shu paytda jadvalning hamma varaqlari o'zi yaratiladi** (81 ta mahsulot — Jadval.xlsx'dan, 5 ta filial, foydalanuvchilar bilan).
 6. Sheets sahifasini yangilang — tepada **«Дорихона»** menyusi paydo bo'ladi.
 7. Manzilni saytga ulash (✅ qilingan: `app.js` → `DEFAULT_API_URL`) — ikki yo'l:
    - `app.js` boshidagi `DEFAULT_API_URL = ''` ga manzilni yozib GitHub'ga push qiling (hamma qurilmada o'zi ishlaydi), **yoki**
@@ -66,7 +66,7 @@ Bitta hujjatda bir nechta mahsulot bo'lsa — har mahsulot alohida qator, Ҳуж
 
 | Varaq | Ustunlar | Izoh |
 |---|---|---|
-| **Маҳсулотлар** | Маҳсулот, Нарх, Бирлик, Минимал қолдиқ, Изоҳ | Boshlang'ich 5 ta BAD. Нарх — sotuvda avtomatik qo'yiladi (o'zgartirsa bo'ladi). Минимал — shundan kam qolsa ogohlantiradi |
+| **Маҳсулотлар** | Маҳсулот, Нарх, Бирлик, Минимал қолдиқ, Изоҳ | 81 ta mahsulot (Jadval.xlsx). Nomida hajmi qavsda: «Qora Yong'oq (500gr)». **Нарх bo'sh — o'zingiz yozasiz**; yozilsa sotuvda avtomatik qo'yiladi, yozilmasa sotuvchi har safar kiritadi. Минимал (3) — shundan kam qolsa ogohlantiradi. Yangi mahsulot — shu varaqqa yangi qator |
 | **Филиаллар** | Филиал, Манзил, Телефон | Boshlang'ich: 1-филиал … 5-филиал. **Ishlatishdan oldin haqiqiy nomlarni yozing** |
 | **Докторлар** | Врач, Изоҳ | Sotuvda yangi vrach yozilsa, bu yerga o'zi qo'shiladi |
 | **Фойдаланувчилар** | Исм, PIN, Роль, Филиал | `админ` — hammasini ko'radi. `сотувчи` — faqat o'z filiali (Филиал ustuni majburiy) |
@@ -91,7 +91,7 @@ Boshlang'ich PIN'lar: **Админ 1234**, Сотувчи 1…5 → **1111, 2222
 
 | Bo'lim | Kim | Vazifasi |
 |---|---|---|
-| **Сотув** (расход) | hamma | **Мижоз Ф.И.Ш** (majburiy), **Юборган врач** (ro'yxatdan yoki yangi), mahsulotlar: **сони, нарх, сумма**. Qoldiqdan ko'p sotib bo'lmaydi. O'ngda — bugungi sotuvlar |
+| **Сотув** (расход) | hamma | **Мижоз Ф.И.Ш** (majburiy), **Юборган врач** (ro'yxatdan yoki yangi), mahsulotlar (nomini yozib qidiriladi): **сони, нарх, сумма** (summasiz sotib bo'lmaydi). Qoldiqdan ko'p sotib bo'lmaydi. O'ngda — bugungi sotuvlar |
 | **Приход** | hamma | Mahsulot va **сони** (summa yo'q). Qoldiqqa qo'shiladi |
 | **Ўтказма** | hamma | O'z filialidan → boshqa filialga, mahsulot va сони. Qabul qiluvchi filialdagi qoldiq ham ko'rinadi |
 | **Қолдиқ** | hamma | Hamma filiallar qoldig'i (sotuvchi qayerdan so'rashni biladi). «Кам қолган» ro'yxati — qaysi filialda ortig'i borligini ko'rsatadi |
