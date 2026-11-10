@@ -8,8 +8,8 @@
 
 // Baza: «Др Шерматов аптека» — https://docs.google.com/spreadsheets/d/1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI
 const SPREADSHEET_ID = '1Q-2g08ceeG_8CHRrpZ0opwXYOcKcX8NYUtnFXSk0ZdI';
-const VERSION = '1';
-const SCHEMA = '1';
+const VERSION = '2';
+const SCHEMA = '2';
 const TZ = 'Asia/Tashkent';
 
 const SH = {
@@ -234,25 +234,90 @@ function order_(ss, cfg) {
   if (first) ss.setActiveSheet(first);
 }
 
-/** Har filial uchun ko'rinish varag'i: FILTER formulasi bilan, qo'lda yozilmaydi. */
+/**
+ * Har filial uchun alohida varaq (1-филиал …): shu filialning hamma harakati, kirgan o'tkazmalar ham.
+ * Formula emas — server har yozuvni Ҳаракатлар'ga va shu varaqqa bir vaqtda yozadi
+ * (jadval tili/locale qanday bo'lishidan qat'i nazar ishlaydi).
+ */
+const VIEW_N = NC - 1; // rid ustunisiz
+
+function isViewName_(cfg, name) {
+  return [SH.MOV, SH.STOCK].concat(CFG_SHEETS).indexOf(name) < 0 &&
+    cfg.branches.some(function (b) { return b.name === name; });
+}
+
 function ensureViews_(ss, cfg) {
-  const last = String.fromCharCode(64 + NC - 1); // rid ustunisiz
   cfg.branches.forEach(function (b) {
-    if ([SH.MOV, SH.STOCK].concat(CFG_SHEETS).indexOf(b.name) >= 0) return;
+    if (!isViewName_(cfg, b.name)) return;
     let sh = ss.getSheetByName(b.name);
+    let rebuild = false;
     if (!sh) {
       sh = ss.insertSheet(b.name);
-      sh.getRange(1, 1, 1, NC - 1).setValues([MOV_COLS.slice(0, NC - 1)])
+      rebuild = true;
+    } else if (sh.getRange('A2').getFormula()) {
+      sh.getRange('A2').setFormula('');
+      rebuild = true; // eski versiyadagi FILTER formulasi
+    }
+    if (rebuild) {
+      sh.getRange(1, 1, 1, VIEW_N).setValues([MOV_COLS.slice(0, VIEW_N)])
         .setFontWeight('bold').setFontColor('#ffffff').setBackground('#0e7490');
       sh.setFrozenRows(1);
       widths_(sh, [90, 90, 60, 80, 100, 260, 60, 90, 100, 200, 150, 100, 70, 110, 220]);
+      sh.getRange('A:C').setNumberFormat('@');
       sh.getRange('G:I').setNumberFormat('#,##0');
+      rebuildView_(ss, b.name);
     }
-    const q = String(b.name).replace(/"/g, '""');
-    const m = "'" + SH.MOV + "'!";
-    const f = '=IFERROR(FILTER(' + m + 'A2:' + last + ', (' + m + 'E2:E="' + q + '")+(' + m + 'L2:L="' + q + '")), "")';
-    const cell = sh.getRange('A2');
-    if (cell.getFormula() !== f) cell.setFormula(f);
+  });
+}
+
+/** Filial varag'ini Ҳаракатлар'dan noldan qayta yozish. */
+function rebuildView_(ss, name) {
+  const sh = ss.getSheetByName(name);
+  if (!sh) return;
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(VIEW_N, sh.getLastColumn())).clearContent();
+  const mov = ss.getSheetByName(SH.MOV);
+  const n = mov.getLastRow();
+  if (n < 2) return;
+  const rows = mov.getRange(2, 1, n - 1, VIEW_N).getValues().filter(function (r) {
+    return r[I.DOC] !== '' && (String(r[I.BR]) === name || String(r[I.TO]) === name);
+  });
+  if (rows.length) sh.getRange(2, 1, rows.length, VIEW_N).setValues(rows);
+}
+
+function rebuildViews_(ss, cfg) {
+  cfg.branches.forEach(function (b) { if (isViewName_(cfg, b.name)) rebuildView_(ss, b.name); });
+}
+
+/** Yangi qatorlarni tegishli filial varaqlariga qo'shish. */
+function appendViews_(ss, rows) {
+  const by = {};
+  rows.forEach(function (r) {
+    [String(r[I.BR]), String(r[I.TO])].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).forEach(function (b) {
+      (by[b] = by[b] || []).push(r.slice(0, VIEW_N));
+    });
+  });
+  Object.keys(by).forEach(function (b) {
+    if ([SH.MOV, SH.STOCK].concat(CFG_SHEETS).indexOf(b) >= 0) return;
+    const sh = ss.getSheetByName(b);
+    if (sh) sh.getRange(sh.getLastRow() + 1, 1, by[b].length, VIEW_N).setValues(by[b]);
+  });
+}
+
+/** Bekor qilinganda filial varaqlaridagi Ҳолат va Изоҳ'ni ham yangilash. */
+function updateViewsDoc_(ss, branches, doc, status, notes) {
+  branches.filter(function (x, i, a) { return x && a.indexOf(x) === i; }).forEach(function (b) {
+    if ([SH.MOV, SH.STOCK].concat(CFG_SHEETS).indexOf(b) >= 0) return;
+    const sh = ss.getSheetByName(b);
+    if (!sh || sh.getLastRow() < 2) return;
+    const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    let k = 0;
+    for (let i = 0; i < ids.length && k < status.length; i++) {
+      if (String(ids[i][0]) === doc) {
+        sh.getRange(i + 2, I.STATUS + 1).setValue(status[k][0]);
+        sh.getRange(i + 2, I.NOTE + 1).setValue(notes[k][0]);
+        k++;
+      }
+    }
   });
 }
 
@@ -499,6 +564,7 @@ function nextDoc_(type) {
 function append_(ss, rows) {
   const sh = ss.getSheetByName(SH.MOV);
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, NC).setValues(rows);
+  appendViews_(ss, rows);
 }
 
 function base_(doc, type, branch, user, req) {
@@ -638,6 +704,7 @@ function cancel_(ss, cfg, user, req) {
   const notes = rows.map(function (r) { return [r[I.NOTE] ? r[I.NOTE] + ' · ' + stamp : stamp]; });
   sh.getRange(first + 2, I.STATUS + 1, rows.length, 1).setValues(status);
   sh.getRange(first + 2, I.NOTE + 1, rows.length, 1).setValues(notes);
+  updateViewsDoc_(ss, [br, to], doc, status, notes);
   applyDelta_(ss, cfg, deltas);
   return { doc: doc, cancelled: true };
 }
@@ -924,7 +991,7 @@ function hash_(s) {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Дорихона')
     .addItem('Ўрнатиш / янгилаш (варақлар)', 'menuSetup')
-    .addItem('Қолдиқни қайта ҳисоблаш', 'menuRecompute')
+    .addItem('Қолдиқ ва филиал варақларини қайта ҳисоблаш', 'menuRecompute')
     .addItem('Кешни тозалаш', 'menuClearCache')
     .addSeparator()
     .addItem('⚠ Синов маълумотларини тозалаш', 'menuClearData')
@@ -935,6 +1002,7 @@ function menuSetup() {
   const ss = ss_();
   CacheService.getScriptCache().remove('cfg');
   ensure_(ss, true);
+  rebuildViews_(ss, getCfg_(ss));
   bumpVer_();
   SpreadsheetApp.getUi().alert('Тайёр: ҳамма варақлар ва устунлар текширилди.');
 }
@@ -942,9 +1010,11 @@ function menuSetup() {
 function menuRecompute() {
   const ss = ss_();
   CacheService.getScriptCache().remove('cfg');
-  recompute_(ss, getCfg_(ss));
+  const cfg = getCfg_(ss);
+  recompute_(ss, cfg);
+  rebuildViews_(ss, cfg);
   bumpVer_();
-  SpreadsheetApp.getUi().alert('Қолдиқ ҳамма ҳаракатлардан қайта ҳисобланди.');
+  SpreadsheetApp.getUi().alert('Қолдиқ ва филиал варақлари ҳамма ҳаракатлардан қайта ҳисобланди.');
 }
 
 function menuClearCache() {
@@ -971,7 +1041,9 @@ function menuClearData() {
     if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
     PropertiesService.getScriptProperties().setProperty('doc', '0');
     CacheService.getScriptCache().remove('cfg');
-    recompute_(ss, getCfg_(ss));
+    const cfg = getCfg_(ss);
+    rebuildViews_(ss, cfg);
+    recompute_(ss, cfg);
     bumpVer_();
   } finally {
     lock.releaseLock();

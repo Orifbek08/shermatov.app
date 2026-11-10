@@ -1,6 +1,7 @@
 # Др. Шерматов — dorixonalar tarmog'i · platforma hujjati
 
-> Holat: 10.11.2026 · Sayt: **app.js v1 / style.css v1** · Server: **Code.gs v1 (SCHEMA 1)**
+> Holat: 10.11.2026 · Sayt: **app.js v1 / style.css v1** · Server: **Code.gs v2 (SCHEMA 2)**
+> Sayt: **https://shermatovapp.vercel.app** · Baza: **«Др Шерматов аптека»** Google Sheets
 > Kod: **GitHub → `Orifbek08/shermatov.app`** (main)
 
 Ilova matni 100% kirillda; bu hujjat lotinda, varaq/ustun/tugma nomlari ilovadagidek kirillda berilgan.
@@ -40,7 +41,7 @@ Oddiy HTML/CSS/JS — framework, build yoki `npm` kerak emas.
 5. Shu manzilni brauzerda oching → `{"ok":true,"app":"shermatov","v":"1"}` chiqadi.
    **Shu paytda jadvalning hamma varaqlari o'zi yaratiladi** (5 ta BAD mahsulot, 5 ta filial, foydalanuvchilar bilan).
 6. Sheets sahifasini yangilang — tepada **«Дорихона»** menyusi paydo bo'ladi.
-7. Manzilni saytga ulash — ikki yo'l:
+7. Manzilni saytga ulash (✅ qilingan: `app.js` → `DEFAULT_API_URL`) — ikki yo'l:
    - `app.js` boshidagi `DEFAULT_API_URL = ''` ga manzilni yozib GitHub'ga push qiling (hamma qurilmada o'zi ishlaydi), **yoki**
    - saytning kirish sahifasida **⚙ Сервер манзили** ni bosib, manzilni qo'ying (faqat shu qurilmada saqlanadi).
 
@@ -56,7 +57,7 @@ Varaqlar va ustunlar **o'zi yaratiladi**. Eski ma'lumot o'chirilmaydi, faqat yet
 |---|---|
 | **Ҳаракатлар** | **Hamma harakat bitta joyda**: Приход, Расход, Ўтказма. Ustunlar: Ҳужжат №, Сана, Вақт, Тури, Филиал, Маҳсулот, Сони, Нарх, Сумма, Мижоз Ф.И.Ш, Юборган врач, Қаерга (o'tkazmada), Ҳолат, Оператор, Изоҳ |
 | **Қолдиқ** | Mahsulot × filial jadvali, Жами, Минимал. Har yozuvdan keyin server o'zi yangilaydi. Sariq — minimalga yetgan, qizil — tugagan |
-| **1-филиал … 5-филиал** | Har filialning **ko'rinishi**: `FILTER` formulasi (shu filialning hamma harakati, kirgan o'tkazmalar ham). Qo'lda yozilmaydi |
+| **1-филиал … 5-филиал** | Har filialning **o'z varag'i**: shu filialning hamma harakati, kirgan o'tkazmalar ham. Formula emas — server har yozuvni Ҳаракатлар'ga va shu varaqqa birga yozadi. Qo'lda yozilmaydi |
 
 Bitta hujjatda bir nechta mahsulot bo'lsa — har mahsulot alohida qator, Ҳужжат № bir xil.
 Ҳужжат № prefiksi: **С** — сотув (расход), **П** — приход, **Ў** — ўтказма.
@@ -73,14 +74,14 @@ Bitta hujjatda bir nechta mahsulot bo'lsa — har mahsulot alohida qator, Ҳуж
 
 Boshlang'ich PIN'lar: **Админ 1234**, Сотувчи 1…5 → **1111, 2222, 3333, 4444, 5555**. ⚠ **Albatta almashtiring.**
 
-> ⚠ Filial yoki mahsulot nomini **ishlatilgandan keyin o'zgartirmang** — eski yozuvlarda eski nom qoladi va qoldiq ikkiga bo'linadi. Nom o'zgartirilsa: «Дорихона → Қолдиқни қайта ҳисоблаш».
+> ⚠ Filial yoki mahsulot nomini **ishlatilgandan keyin o'zgartirmang** — eski yozuvlarda eski nom qoladi va qoldiq ikkiga bo'linadi. Nom o'zgartirilsa: «Дорихона → Қолдиқ ва филиал варақларини қайта ҳисоблаш».
 
 ### 3.3. «Дорихона» menyusi
 
 | Band | Nima qiladi |
 |---|---|
 | Ўрнатиш / янгилаш (варақлар) | Hamma varaq/ustunni tekshiradi, yetishmaganini yaratadi (yangi filial qo'shilsa — uning varag'i ham) |
-| Қолдиқни қайта ҳисоблаш | Қолдиқ'ni Ҳаракатлар'dan noldan hisoblaydi (qo'lda tuzatishdan keyin) |
+| Қолдиқ ва филиал варақларини қайта ҳисоблаш | Қолдиқ va filial varaqlarini Ҳаракатлар'dan noldan qayta yozadi (Ҳаракатлар qo'lda tuzatilgandan keyin) |
 | Кешни тозалаш | O'zgarishlar saytga darhol tushadi (odatda kerak emas — sozlama varaqlari tahrirlansa kesh o'zi tozalanadi) |
 | ⚠ Синов маълумотларини тозалаш | Avval **zaxira nusxa** yaratadi, keyin hamma harakatlarni o'chiradi. Sozlamalar qoladi. Tasdiq: `1234` |
 
@@ -130,10 +131,10 @@ Sayt fayllari o'zgarsa — `index.html` dagi `style.css?v=1`, `app.js?v=1` raqam
 | «Сервер жавоби нотўғри» | Apps Script'da bitta `Code.gs` → New version → Deploy |
 | «Сеанс тугади — қайта киринг» | PIN o'zgargan yoki 30 kun o'tgan — qayta kiring |
 | Yangi narx/mahsulot chiqmayapti | «Дорихона → Кешни тозалаш» |
-| Qoldiq noto'g'ri ko'rinadi | «Дорихона → Қолдиқни қайта ҳисоблаш» |
+| Qoldiq yoki filial varag'i noto'g'ri | «Дорихона → Қолдиқ ва филиал варақларини қайта ҳисоблаш» |
 | Sayt eski ko'rinishda | Ctrl+Shift+R |
 
-**Qo'lda o'zgartirmang:** Ҳаракатлар'dagi Ҳужжат №, filial varaqlaridagi formula, Қолдиқ varag'i (server qayta yozadi).
+**Qo'lda o'zgartirmang:** Ҳаракатлар'dagi Ҳужжат №, filial varaqlari va Қолдиқ (server o'zi yozadi).
 
 ---
 
