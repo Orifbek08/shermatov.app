@@ -65,6 +65,10 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* Телефон: икки марта босганда ва майдонга босганда катталашмасин */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
+button, a, input, select, label, .key, .tabbar, .qty { touch-action: manipulation; }
+body { -webkit-tap-highlight-color: transparent; }
 body {
   font-family: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   background: var(--mint); color: var(--ink); line-height: 1.45;
@@ -477,10 +481,13 @@ input.inline.saved { border-color: var(--leaf); background: var(--leaf-soft); }
 /* ── telefon ── */
 @media (max-width: 860px) {
   :root { font-size: 14.5px; }
+  /* iPhone 16px'дан кичик майдонга босганда саҳифани катталаштиради — шуни тўхтатиш */
+  input, select, textarea { font-size: 16px !important; }
   .shell { display: block; }
   .rail { display: none; }
   .m-only { display: grid !important; }
   .stage { padding: 12px 12px calc(92px + env(safe-area-inset-bottom)); }
+  .stage { padding-top: max(12px, env(safe-area-inset-top)); }
   .page-h { flex-wrap: wrap; gap: 10px 12px; margin-bottom: 14px; }
   .page-h .mark { width: 36px; height: 36px; }
   .page-h h1 { font-size: 22px; }
