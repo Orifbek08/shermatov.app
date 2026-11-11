@@ -519,6 +519,7 @@ begin
   elsif a = 'transfer' then return apteka.do_transfer(u, req);
   elsif a = 'cancel' then return apteka.do_cancel(u, req);
   elsif a = 'history' then return apteka.history(u, req);
+  elsif a = 'clients' then return apteka.clients(req);
   end if;
 
   if u.role <> 'admin' then perform apteka.fail('Фақат админ учун'); end if;

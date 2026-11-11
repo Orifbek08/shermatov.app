@@ -461,7 +461,7 @@ function viewSale() {
     <section class="panel sheet">
       <div class="who">
         <label class="field"><span>Мижоз Ф.И.Ш <b class="req" title="Мажбурий">*</b></span>
-          <div class="in-ic">${ic('user')}<input id="f-client" data-ff="client" value="${esc(f.client)}" placeholder="Масалан: Каримов Алишер" autocomplete="off"></div>
+          <div class="in-ic">${ic('user')}<input id="f-client" data-ff="client" value="${esc(f.client)}" placeholder="Масалан: Каримов Алишер" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ac-client"><div class="ac hidden" id="ac-client" role="listbox"></div></div>
         </label>
         <label class="field"><span>Юборган врач</span>
           <div class="in-ic">${ic('doctor')}<input id="f-doctor" data-ff="doctor" list="dl-doctors" value="${esc(f.doctor)}" placeholder="Рўйхатдан танланг ёки ёзинг" autocomplete="off"></div>
@@ -524,6 +524,77 @@ function toHint() {
   const ps = [...new Set(f.lines.filter((l) => l.product).map((l) => l.product))];
   if (!ps.length) return '';
   return `${ic('box')}<span>${esc(f.to)} қолдиғи: ${ps.map((p) => `${esc(p)} — <b>${stockOf(f.to, p)}</b>`).join(', ')}</span>`;
+}
+
+/* mijoz qidiruvi (Ф.И.Ш yozilganda taklif, hamma filiallar bo'yicha) */
+
+const AC = { items: [], idx: -1, timer: 0, seq: 0, cache: new Map() };
+
+function acQuery(text) {
+  clearTimeout(AC.timer);
+  const q = text.trim();
+  if (q.length < 2) return acClose();
+  const key = q.toLowerCase();
+  if (AC.cache.has(key)) return acShow(AC.cache.get(key));
+  AC.timer = setTimeout(async () => {
+    const my = ++AC.seq;
+    try {
+      const j = await api('clients', { q });
+      AC.cache.set(key, j.rows || []);
+      if (my === AC.seq && $('#f-client') && $('#f-client').value.trim().toLowerCase() === key) acShow(j.rows || []);
+    } catch (e) { /* таклиф бўлмаса ҳам ёзиш давом этади */ }
+  }, 220);
+}
+
+function acShow(items) {
+  const box = $('#ac-client');
+  const inp = $('#f-client');
+  if (!box || !inp || document.activeElement !== inp) return;
+  AC.items = items; AC.idx = -1;
+  if (!items.length) return acClose();
+  box.innerHTML = items.map((c, i) => `<button type="button" role="option" data-ac="${i}" id="ac-o${i}">
+      <b>${esc(c.name)}</b>
+      <small>${c.visits} марта, охирги ${dLabel(c.last)} · ${esc(c.branch)}${c.doctor ? ' · ' + esc(c.doctor) : ''}</small>
+    </button>`).join('');
+  box.classList.remove('hidden');
+  inp.setAttribute('aria-expanded', 'true');
+}
+
+function acClose() {
+  const box = $('#ac-client');
+  if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+  const inp = $('#f-client');
+  if (inp) { inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); }
+  AC.items = []; AC.idx = -1;
+}
+
+function acMove(d) {
+  if (!AC.items.length) return;
+  AC.idx = (AC.idx + d + AC.items.length) % AC.items.length;
+  document.querySelectorAll('#ac-client [data-ac]').forEach((b, i) => b.classList.toggle('on', i === AC.idx));
+  const inp = $('#f-client');
+  if (inp) inp.setAttribute('aria-activedescendant', 'ac-o' + AC.idx);
+}
+
+function acPick(i) {
+  const c = AC.items[i];
+  if (!c) return;
+  const f = form('sale');
+  f.client = c.name;
+  $('#f-client').value = c.name;
+  const doc = $('#f-doctor');
+  if (c.doctor && doc && !doc.value.trim()) { doc.value = c.doctor; f.doctor = c.doctor; }
+  acClose();
+  const next = document.querySelector('#lines .prod-in');
+  if (next) next.focus();
+}
+
+function onViewKey(e) {
+  if (e.target.id !== 'f-client' || !AC.items.length) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); acMove(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acMove(-1); }
+  else if (e.key === 'Enter' && AC.idx >= 0) { e.preventDefault(); acPick(AC.idx); }
+  else if (e.key === 'Escape') { acClose(); }
 }
 
 /* yon panel: bugungi hujjatlar */
@@ -601,6 +672,7 @@ function onViewInput(e) {
   const f = form(kind);
   if (t.dataset.ff) {
     f[t.dataset.ff] = t.value;
+    if (t.id === 'f-client') acQuery(t.value);
     if (t.dataset.ff === 'to') { const h = $('#to-hint'); if (h) h.innerHTML = toHint(); }
     return;
   }
@@ -647,6 +719,7 @@ function onViewInput(e) {
 
 function onViewBlur(e) {
   const t = e.target;
+  if (t.id === 'f-client') setTimeout(acClose, 120);
   if (t.dataset && t.dataset.f === 'product' && isForm(S.page)) {
     const l = form(S.page).lines[Number(t.dataset.i)];
     if (l && l.product) t.value = l.product;
@@ -770,6 +843,7 @@ async function submit(kind) {
     const label = { sale: 'Сотилди', income: 'Приход қилинди', transfer: 'Ўтказилди' }[kind];
     toast(`${label}: ${j.doc}${kind === 'sale' && j.total != null ? ', ' + money(j.total) : ''}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
     S.hist.data = null; S.rep.data = null;
+    if (kind === 'sale') AC.cache.clear();
     renderView();
     const first = document.querySelector(kind === 'sale' ? '#f-client' : '#lines .prod-in');
     if (first) first.focus();
@@ -1285,6 +1359,11 @@ function start() {
     if (e.target.tagName === 'SELECT' && e.target.id !== 'branch-sel') onViewInput(e);
   });
   view.addEventListener('focusout', onViewBlur);
+  view.addEventListener('keydown', onViewKey);
+  view.addEventListener('mousedown', (e) => {
+    const o = e.target.closest('[data-ac]');
+    if (o) { e.preventDefault(); acPick(Number(o.dataset.ac)); }
+  });
   view.addEventListener('click', onViewClick);
 
   if (S.token) {
