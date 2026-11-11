@@ -1,6 +1,6 @@
 /**
  * Др. Шерматов — дорихоналар тармоғи
- * Google Sheets НУСХАСИ (v4). Асосий база энди Supabase'да.
+ * Google Sheets НУСХАСИ (v5). Асосий база энди Supabase'да.
  *
  * Бу скрипт ҳар 6 соатда Supabase'дан ҳамма маълумотни олиб, шу жадвалга ёзади:
  * Ҳаракатлар, Қолдиқ, филиал варақлари, Маҳсулотлар, Филиаллар, Докторлар, Фойдаланувчилар (PIN'сиз), Созламалар.
@@ -11,7 +11,7 @@
  * Биринчи марта: Дорихона → «Ҳар 6 соатда нусха олишни ёқиш» (Google рухсат сўрайди).
  */
 
-const VERSION = '4';
+const VERSION = '5';
 const SB_URL = 'https://hfrfskwglwnbcaymzbad.supabase.co';
 const SB_KEY = 'sb_publishable_I0CJDGavnnEzWGiTD2ri9Q_XAtDfW52';
 const EXPORT_KEY = '__EXPORT_KEY__'; // экспорт калити (GitHub'да сақланмайди)
@@ -105,6 +105,17 @@ function mirror() {
     brs.forEach(function (b) {
       write_(ss, b, MOV_COLS, rows.filter(function (r) { return r[4] === b || r[11] === b; }),
         { color: '#1e9e63', widths: MOV_W, text: 'A:C', num: 'G:I' });
+    });
+
+    // Номи ўзгарган ёки ўчирилган филиалнинг эски варағини олиб ташлаш
+    // (фақат шу скрипт яратган варақлар: сарлавҳаси «Ҳужжат №» … «Изоҳ»)
+    ss.getSheets().forEach(function (s) {
+      const n = s.getName();
+      if (n === SH.MOV || brs.indexOf(n) >= 0 || s.getLastColumn() < MOV_COLS.length) return;
+      const h = s.getRange(1, 1, 1, MOV_COLS.length).getValues()[0];
+      if (h[0] === MOV_COLS[0] && h[MOV_COLS.length - 1] === MOV_COLS[MOV_COLS.length - 1] && ss.getSheets().length > 1) {
+        ss.deleteSheet(s);
+      }
     });
 
     // Қолдиқ

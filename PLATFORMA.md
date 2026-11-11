@@ -1,6 +1,6 @@
 # Др. Шерматов — dorixonalar tarmog'i · platforma hujjati
 
-> Holat: 10.11.2026 · Sayt: **app.js v6 / style.css v6** · Baza: **Supabase «shermatov apteka»** · Sheets nusxasi: **Code.gs v4**
+> Holat: 10.11.2026 · Sayt: **app.js v6 / style.css v6** · Baza: **Supabase «shermatov apteka»** · Sheets nusxasi: **Code.gs v5**
 > Sayt: **https://shermatovapp.vercel.app** · Kod: **GitHub → `Orifbek08/shermatov.app`** (main)
 
 Ilova matni 100% kirillda; bu hujjat lotinda, tugma/bo'lim nomlari ilovadagidek kirillda.
@@ -24,7 +24,7 @@ flowchart LR
 |---|---|---|
 | **Sayt** | GitHub → Vercel | Interfeys. Har amal Supabase'dagi bitta funksiyaga yuboriladi |
 | **Baza + server mantig'i** | Supabase, `apteka` sxemasi | Jadvallar, qoldiq, PIN/token, hamma amallar — **har biri bitta tranzaksiyada** |
-| **Sheets nusxasi** | Google Sheets ichidagi Apps Script (`Code.gs` v4) | Har 6 soatda Supabase'dan hammasini olib varaqlarga yozadi |
+| **Sheets nusxasi** | Google Sheets ichidagi Apps Script (`Code.gs` v5) | Har 6 soatda Supabase'dan hammasini olib varaqlarga yozadi |
 
 Tezlik: har so'rov ~0,1–0,3 soniya (Apps Script'da 1–3 soniya edi). Boshqa filialdagi o'zgarish 15 soniya ichida ko'rinadi.
 
@@ -59,9 +59,11 @@ Mahsulot va filial **ID bilan** bog'langan — nomini o'zgartirish xavfsiz, eski
 
 ---
 
-## 3. Google Sheets nusxasi (Code.gs v4)
+## 3. Google Sheets nusxasi (Code.gs v5)
 
-Jadval: **«Др Шерматов аптека»**. Varaqlar: Ҳаракатлар, Қолдиқ, 1-филиал … 5-филиал, Маҳсулотлар, Филиаллар, Докторлар, Фойдаланувчилар (**PIN'siz**), Созламалар (oxirgi nusxa vaqti).
+Jadval: **«Др Шерматов аптека»**. Varaqlar: Ҳаракатлар, Қолдиқ, har filialning o'z varag'i (Фарғона, Тошкент Янгиҳаёт, Термиз Истиқбол, Термиз Улуғбек, Тошкент Қурувчи), Маҳсулотлар, Филиаллар, Докторлар, Фойдаланувчилар (**PIN'siz**), Созламалар (oxirgi nusxa vaqti).
+
+Filial nomi o'zgarsa yoki o'chirilsa — eski varag'i keyingi nusxada o'zi olib tashlanadi.
 
 ⚠ **Jadval — faqat nusxa.** Bu yerdagi o'zgarish saytga tushmaydi va keyingi nusxada ustidan yoziladi. Varaqlar «ogohlantirish» bilan himoyalangan.
 
