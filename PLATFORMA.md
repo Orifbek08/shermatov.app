@@ -61,7 +61,7 @@ Mahsulot va filial **ID bilan** bog'langan — nomini o'zgartirish xavfsiz, eski
 
 ## 3. Google Sheets nusxasi (Code.gs v5)
 
-Jadval: **«Др Шерматов аптека»**. Varaqlar: Ҳаракатлар, Қолдиқ, har filialning o'z varag'i (Фарғона, Тошкент Янгиҳаёт, Термиз Истиқбол, Термиз Улуғбек, Тошкент Қурувчи), Маҳсулотлар, Филиаллар, Докторлар, Фойдаланувчилар (**PIN'siz**), Созламалар (oxirgi nusxa vaqti).
+Jadval: **«Др Шерматов аптека»**. Varaqlar: Ҳаракатлар, Қолдиқ, har filialning o'z varag'i (Термиз Истиқбол, Термиз Улуғбек, Фарғона, Тошкент Янгиҳаёт, Тошкент Қурувчи), Маҳсулотлар, Филиаллар, Докторлар, Фойдаланувчилар (**PIN'siz**), Созламалар (oxirgi nusxa vaqti).
 
 Filial nomi o'zgarsa yoki o'chirilsa — eski varag'i keyingi nusxada o'zi olib tashlanadi.
 
