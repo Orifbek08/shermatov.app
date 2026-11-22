@@ -13,10 +13,10 @@ const CANCEL = 'Бекор';
 
 const PAGES = [
   { id: 'sale', t: 'Сотув', ic: 'cart', sub: 'Мижозга маҳсулот сотиш' },
-  { id: 'return', t: 'Қайтариш', ic: 'undo', sub: 'Мижоз қайтариб келган маҳсулотни қабул қилиш' },
   { id: 'income', t: 'Приход', ic: 'income', sub: 'Филиалга келган товарни қолдиққа қўшиш', more: true },
   { id: 'transfer', t: 'Ўтказма', ic: 'transfer', sub: 'Бир филиалдан бошқасига товар ўтказиш', more: true },
   { id: 'stock', t: 'Қолдиқ', ic: 'box', sub: 'Ҳамма филиаллардаги қолдиқ' },
+  { id: 'return', t: 'Қайтариш', ic: 'undo', sub: 'Мижоз қайтариб келган маҳсулотни қабул қилиш (фақат сотилган филиалда)' },
   { id: 'history', t: 'Тарих', ic: 'clock', sub: 'Ҳамма ёзувлар, қидирув ва бекор қилиш' },
   { id: 'report', t: 'Ҳисобот', ic: 'chart', sub: 'Сотув, қайтариш, приход ва врачлар бўйича · Excel', admin: true, more: true },
   { id: 'settings', t: 'Созламалар', ic: 'gear', sub: 'Маҳсулотлар, нархлар, филиаллар, врачлар ва фойдаланувчилар', admin: true, more: true },
@@ -947,8 +947,6 @@ function retState() {
 }
 
 function viewReturn() {
-  const nb = needBranch();
-  if (nb) return nb;
   const r = retState();
   return `<div class="work">
     <section class="panel sheet">
@@ -978,7 +976,7 @@ function retBody() {
   if (r.loading) return loadingHTML;
   if (r.error) return `<p class="empty err">${esc(r.error)}</p>`;
   if (!r.results) {
-    return `<div class="ret-empty">${ic('undo')}<p><b>Мижоз маҳсулот қайтариб келдими?</b><br>Чекдаги рақамни (С-12) ёки мижоз исмини ёзинг. Ҳамма филиаллардаги охирги бир йиллик сотувлар ичидан топилади.</p></div>`;
+    return `<div class="ret-empty">${ic('undo')}<p><b>Мижоз маҳсулот қайтариб келдими?</b><br>Чекдаги рақамни (С-12) ёки мижоз исмини ёзинг. ${isAdmin() ? (S.branch ? `«${esc(S.branch)}» филиалининг` : 'Ҳамма филиалларнинг') : 'Шу филиалнинг'} охирги бир йиллик сотувлари ичидан топилади. Маҳсулот сотилган филиал қолдиғига қайтади.</p></div>`;
   }
   if (!r.results.length) return '<p class="empty">Бундай сотув топилмади. Чек рақамини ёки исмни текширинг.</p>';
   return `<div class="sale-list">${r.results.map((d) => {
@@ -1040,7 +1038,7 @@ function retTotals() {
     qty += q;
     sum += r.manual[l.id] ? (r.sums[l.id] || 0) : retDefSum(l, q);
   });
-  el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона ${esc(S.branch)} қолдиғига қайтади</span>`;
+  el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона «${esc(r.sel.branch)}» қолдиғига қайтади</span>`;
 }
 
 function retInput(t) {
@@ -1081,7 +1079,8 @@ async function retFind(autoPick) {
   if (!q) { toast('Чек рақамини ёки мижоз исмини ёзинг', 'err'); return; }
   r.loading = true; r.error = ''; r.sel = null; renderRet();
   try {
-    const j = await api('saleLookup', { q });
+    // чек рақами билан қидирилса, админга филиал филтри қўйилмайди
+    const j = await api('saleLookup', { q, branch: /^\s*[CcСс]?\s*-?\s*\d+\s*$/.test(q) ? '' : S.branch });
     r.results = j.rows || [];
   } catch (e) { r.error = e.message; r.results = null; }
   r.loading = false;
@@ -1105,7 +1104,7 @@ function retFrom(doc) {
   S.ret = null;
   retState().q = doc;
   goPage('return');
-  if (S.branch) retFind(true);
+  retFind(true);
 }
 
 async function retSubmit() {
@@ -1119,12 +1118,12 @@ async function retSubmit() {
   const total = items.reduce((a, x) => a + x.sum, 0);
   if (!(await modal({
     title: 'Қайтаришни тасдиқланг',
-    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади. Мижозга <b>${money(total)}</b> қайтарасиз. Маҳсулот <b>${esc(S.branch)}</b> қолдиғига қўшилади.`,
+    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади. Мижозга <b>${money(total)}</b> қайтарасиз. Маҳсулот <b>${esc(r.sel.branch)}</b> қолдиғига қўшилади.`,
     ok: 'Қайтариш',
   }))) return;
   r.busy = true; renderRet();
   try {
-    const j = await api('return', { branch: S.branch, ref: r.sel.doc, reason: r.reason, items, rid: r.rid });
+    const j = await api('return', { branch: r.sel.branch, ref: r.sel.doc, reason: r.reason, items, rid: r.rid });
     applyState(j);
     toast(`Қайтарилди: ${j.doc}, ${money(j.total)}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
     S.ret = null; S.hist.data = null; S.rep.data = null;
@@ -1277,7 +1276,7 @@ function histTable(d) {
           <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b ${r.type === T.RET ? 'neg' : ''}">${r.sum != null ? (r.type === T.RET ? '−' : '') + fmt(r.sum) : ''}</td>
           <td>${first ? esc(r.client) : ''}</td><td>${first ? esc(r.doctor) : ''}</td><td class="nw muted">${first ? esc(r.op) : ''}</td>
           <td class="note">${first ? (r.ref ? `<b>Асос: ${esc(r.ref)}</b>${r.note ? ' · ' : ''}` : '') + esc(r.note) : ''}</td>
-          <td class="acts">${first && g && g.type === T.OUT && g.status !== CANCEL ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
+          <td class="acts">${first && g && g.type === T.OUT && g.status !== CANCEL && (isAdmin() || g.branch === S.user.branch) ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
