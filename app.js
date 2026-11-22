@@ -8,17 +8,18 @@ const SB_KEY = 'sb_publishable_I0CJDGavnnEzWGiTD2ri9Q_XAtDfW52';
 
 const LS = { token: 'sh_token', cache: 'sh_cache', branch: 'sh_branch', page: 'sh_page' };
 const TZ = 'Asia/Tashkent';
-const T = { IN: 'Приход', OUT: 'Расход', TR: 'Ўтказма' };
+const T = { IN: 'Приход', OUT: 'Расход', TR: 'Ўтказма', RET: 'Қайтариш' };
 const CANCEL = 'Бекор';
 
 const PAGES = [
   { id: 'sale', t: 'Сотув', ic: 'cart', sub: 'Мижозга маҳсулот сотиш' },
-  { id: 'income', t: 'Приход', ic: 'income', sub: 'Филиалга келган товарни қолдиққа қўшиш' },
-  { id: 'transfer', t: 'Ўтказма', ic: 'transfer', sub: 'Бир филиалдан бошқасига товар ўтказиш' },
+  { id: 'return', t: 'Қайтариш', ic: 'undo', sub: 'Мижоз қайтариб келган маҳсулотни қабул қилиш' },
+  { id: 'income', t: 'Приход', ic: 'income', sub: 'Филиалга келган товарни қолдиққа қўшиш', more: true },
+  { id: 'transfer', t: 'Ўтказма', ic: 'transfer', sub: 'Бир филиалдан бошқасига товар ўтказиш', more: true },
   { id: 'stock', t: 'Қолдиқ', ic: 'box', sub: 'Ҳамма филиаллардаги қолдиқ' },
   { id: 'history', t: 'Тарих', ic: 'clock', sub: 'Ҳамма ёзувлар, қидирув ва бекор қилиш' },
-  { id: 'report', t: 'Ҳисобот', ic: 'chart', sub: 'Сотув, приход ва врачлар бўйича', admin: true },
-  { id: 'settings', t: 'Созламалар', ic: 'gear', sub: 'Маҳсулотлар, нархлар, филиаллар, врачлар ва фойдаланувчилар', admin: true, noTab: true },
+  { id: 'report', t: 'Ҳисобот', ic: 'chart', sub: 'Сотув, қайтариш, приход ва врачлар бўйича · Excel', admin: true, more: true },
+  { id: 'settings', t: 'Созламалар', ic: 'gear', sub: 'Маҳсулотлар, нархлар, филиаллар, врачлар ва фойдаланувчилар', admin: true, more: true },
 ];
 
 /* ───────────── ikonkalar ───────────── */
@@ -48,6 +49,9 @@ const ICONS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
   note: '<path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
   pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  undo: '<path d="M9 14.5 4 9.5l5-5"/><path d="M4 9.5h10.5a5.5 5.5 0 0 1 0 11H10"/>',
+  more: '<circle cx="5.5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18.5" cy="12" r="1.5"/>',
+  download: '<path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
@@ -58,7 +62,8 @@ const S = {
   net: 'idle', lastSync: 0, syncing: false,
   forms: {},
   hist: { preset: 'today', from: '', to: '', type: '', q: '', data: null, loading: false },
-  rep: { preset: 'month', from: '', to: '', data: null, loading: false },
+  rep: { preset: 'month', from: '', to: '', branch: '', doctor: '', data: null, loading: false },
+  ret: null,
   stockQ: '',
   set: { tab: 'products', data: null, loading: false, q: '' },
 };
@@ -293,33 +298,23 @@ function renderApp() {
         <span class="mark m-only">${ic('leaf')}</span>
         <div class="ph-t"><h1 id="page-title">${pg.t}</h1><p id="page-sub">${pg.sub}</p></div>
         <div class="ph-r">${netHTML()}${brSel}
-          ${isAdmin() ? `<button class="icon-btn m-only ${S.page === 'settings' ? 'on' : ''}" data-page="settings" id="gear-m" title="Созламалар" aria-label="Созламалар">${ic('gear')}</button>` : ''}
           <button class="icon-btn m-only" id="logout-m" title="Чиқиш" aria-label="Чиқиш">${ic('logout')}</button></div>
       </header>
       <main id="view"></main>
     </div>
-    <nav class="tabbar" id="tabbar" aria-label="Бўлимлар">${navButtons(pages.filter((p) => !p.noTab))}</nav>
+    <nav class="tabbar" id="tabbar" aria-label="Бўлимлар">${navButtons(pages.filter((p) => !p.more))}
+      <button id="more-btn" class="${pg.more ? 'on' : ''}" aria-haspopup="dialog">${ic('more')}<span>Яна</span></button></nav>
   </div>`;
   const out = async () => { if (await confirmBox('Тизимдан чиқасизми?', 'Чиқиш')) logout(); };
   $('#logout').onclick = out;
   $('#logout-m').onclick = out;
   const go = (e) => {
+    if (e.target.closest('#more-btn')) return openMore(pages.filter((p) => p.more));
     const b = e.target.closest('[data-page]');
-    if (!b || b.dataset.page === S.page) return;
-    S.page = b.dataset.page; lsSet(LS.page, S.page);
-    document.querySelectorAll('[data-page]').forEach((x) => {
-      const on = x.dataset.page === S.page;
-      x.classList.toggle('on', on);
-      on ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current');
-    });
-    const p = PAGES.find((x) => x.id === S.page);
-    $('#page-title').textContent = p.t; $('#page-sub').textContent = p.sub;
-    renderView(true);
-    window.scrollTo({ top: 0 });
+    if (b) goPage(b.dataset.page);
   };
   $('#tabs').onclick = go;
   $('#tabbar').onclick = go;
-  if ($('#gear-m')) $('#gear-m').onclick = go;
   const bs = $('#branch-sel');
   if (bs) bs.onchange = () => {
     S.branch = bs.value; lsSet(LS.branch, S.branch);
@@ -329,10 +324,39 @@ function renderApp() {
   renderView(true);
 }
 
+function goPage(id) {
+  if (id === S.page) return;
+  S.page = id; lsSet(LS.page, S.page);
+  document.querySelectorAll('[data-page]').forEach((x) => {
+    const on = x.dataset.page === S.page;
+    x.classList.toggle('on', on);
+    on ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current');
+  });
+  const p = PAGES.find((x) => x.id === S.page);
+  const mb = $('#more-btn'); if (mb) mb.classList.toggle('on', !!p.more);
+  $('#page-title').textContent = p.t; $('#page-sub').textContent = p.sub;
+  renderView(true);
+  window.scrollTo({ top: 0 });
+}
+
+/** Телефонда: пастки менюга сиғмаган бўлимлар */
+function openMore(list) {
+  const root = $('#modal-root');
+  root.innerHTML = `<div class="ov sheet-ov"><div class="bsheet" role="dialog" aria-modal="true" aria-label="Бўлимлар">
+    <span class="grab"></span>
+    ${list.map((p) => `<button data-go="${p.id}" class="${p.id === S.page ? 'on' : ''}">${ic(p.ic)}<span><b>${p.t}</b><small>${p.sub}</small></span></button>`).join('')}
+  </div></div>`;
+  const close = () => { const ov = $('.ov'); if (ov) ov.classList.add('out'); setTimeout(() => { root.innerHTML = ''; }, 160); };
+  $('.ov').onclick = (e) => {
+    const b = e.target.closest('[data-go]');
+    if (b) { close(); goPage(b.dataset.go); } else if (e.target.classList.contains('ov')) close();
+  };
+}
+
 function renderView(animate) {
   const v = $('#view');
   if (!v) return;
-  const fn = { sale: viewSale, income: viewIncome, transfer: viewTransfer, stock: viewStock, history: viewHistory, report: viewReport, settings: viewSettings }[S.page];
+  const fn = { sale: viewSale, return: viewReturn, income: viewIncome, transfer: viewTransfer, stock: viewStock, history: viewHistory, report: viewReport, settings: viewSettings }[S.page];
   v.innerHTML = fn ? fn() : '';
   if (animate) { v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter'); }
   if (isForm(S.page) && $('#f-total')) {
@@ -350,6 +374,9 @@ function softRefresh() {
     const dl = $('#dl-products');
     if (dl) dl.innerHTML = prodOptions();
     form(S.page).lines.forEach((_, j) => updateLineMeta(S.page, j));
+  } else if (S.page === 'return') {
+    const side = $('#side');
+    if (side) side.innerHTML = sideHTML('return');
   } else if (S.page === 'stock') {
     renderView();
   }
@@ -357,7 +384,7 @@ function softRefresh() {
 
 function after() {
   if (S.page === 'history' && !S.hist.data && !S.hist.loading) loadHistory();
-  if (S.page === 'report' && !S.rep.data && !S.rep.loading) loadReport();
+  if (S.page === 'report' && !S.rep.data && !S.rep.loading && !S.rep.error) loadReport();
   if (S.page === 'settings' && !S.set.data && !S.set.loading) loadSettings();
 }
 
@@ -590,6 +617,7 @@ function acPick(i) {
 }
 
 function onViewKey(e) {
+  if (e.target.id === 'ret-q' && e.key === 'Enter') { e.preventDefault(); retFind(); return; }
   if (e.target.id !== 'f-client' || !AC.items.length) return;
   if (e.key === 'ArrowDown') { e.preventDefault(); acMove(1); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); acMove(-1); }
@@ -605,7 +633,7 @@ function groupDocs(rows) {
     let g = m.get(r.doc);
     if (!g) {
       g = { doc: r.doc, date: r.date, time: r.time, type: r.type, branch: r.branch, to: r.to, client: r.client,
-        doctor: r.doctor, op: r.op, note: r.note, status: r.status, lines: [], sum: 0, qty: 0 };
+        doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', lines: [], sum: 0, qty: 0 };
       m.set(r.doc, g);
     }
     g.lines.push(r);
@@ -623,9 +651,11 @@ function canCancel(g) {
 
 function docCard(g) {
   const off = g.status === CANCEL;
-  const lines = g.lines.map((l) => `<li><span class="nm">${esc(l.product)}</span><span class="q">${fmt(l.qty)} × ${g.type === T.OUT && l.sum != null ? fmt(l.sum) : 'дона'}</span></li>`).join('');
+  const money_ = g.type === T.OUT || g.type === T.RET;
+  const lines = g.lines.map((l) => `<li><span class="nm">${esc(l.product)}</span><span class="q">${fmt(l.qty)} × ${money_ && l.sum != null ? fmt(l.sum) : 'дона'}</span></li>`).join('');
   let who = '';
   if (g.type === T.OUT) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span>${g.doctor ? `<span>${ic('doctor')}${esc(g.doctor)}</span>` : ''}</div>`;
+  if (g.type === T.RET) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span><span>${ic('undo')}${esc(g.ref)} дан</span></div>${g.note ? `<div class="doc-who muted"><span>${ic('note')}${esc(g.note)}</span></div>` : ''}`;
   if (g.type === T.TR) who = `<div class="doc-who"><span class="route-s">${esc(g.branch)} ${ic('arrow')} ${esc(g.to)}</span></div>`;
   if (g.type === T.IN && g.note) who = `<div class="doc-who"><span>${ic('note')}${esc(g.note)}</span></div>`;
   const showBr = !S.branch && g.type !== T.TR;
@@ -635,25 +665,34 @@ function docCard(g) {
       ${canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(g.doc)}" title="Ҳужжатни бекор қилиш">Бекор қилиш</button>` : ''}</header>
     ${who}
     <ul>${lines}</ul>
-    <footer><b>${g.type === T.OUT ? money(g.sum) : fmt(g.qty) + ' дона'}</b><span>${esc(g.op)}</span></footer>
+    <footer><b class="${g.type === T.RET ? 'neg' : ''}">${g.type === T.OUT ? money(g.sum) : g.type === T.RET ? '−' + money(g.sum) : fmt(g.qty) + ' дона'}</b><span>${esc(g.op)}</span></footer>
   </article>`;
 }
 
 function sideHTML(kind) {
-  const type = { sale: T.OUT, income: T.IN, transfer: T.TR }[kind];
+  const type = { sale: T.OUT, income: T.IN, transfer: T.TR, return: T.RET }[kind];
   const rows = S.today.filter((r) => r.type === type && (!S.branch || r.branch === S.branch || (type === T.TR && r.to === S.branch)));
   const docs = groupDocs(rows).reverse();
   const act = docs.filter((d) => d.status !== CANCEL);
-  const title = { sale: 'Бугунги сотувлар', income: 'Бугунги приход', transfer: 'Бугунги ўтказмалар' }[kind];
+  const title = { sale: 'Бугунги сотувлар', income: 'Бугунги приход', transfer: 'Бугунги ўтказмалар', return: 'Бугунги қайтаришлар' }[kind];
   let stats = '';
   if (kind === 'sale') {
+    const rets = groupDocs(S.today.filter((r) => r.type === T.RET && r.status !== CANCEL && (!S.branch || r.branch === S.branch)));
+    const retSum = rets.reduce((a, d) => a + d.sum, 0);
+    const gross = act.reduce((a, d) => a + d.sum, 0);
     stats = `<div class="feed-stats">
-      <div class="fs-main"><small>Тушум</small><b>${fmt(act.reduce((a, d) => a + d.sum, 0))}</b><small>${cur()}</small></div>
+      <div class="fs-main"><small>Тушум${retSum ? ' (соф)' : ''}</small><b>${fmt(gross - retSum)}</b><small>${cur()}</small>${retSum ? `<em>қайтариш −${fmt(retSum)}</em>` : ''}</div>
       <div><small>Чеклар</small><b>${act.length}</b></div>
       <div><small>Дона</small><b>${fmt(act.reduce((a, d) => a + d.qty, 0))}</b></div>
     </div>`;
   }
-  const empty = { sale: 'Бугун ҳали сотув йўқ. Биринчи сотув шу ерда пайдо бўлади.', income: 'Бугун ҳали приход қилинмаган.', transfer: 'Бугун ҳали ўтказма йўқ.' }[kind];
+  if (kind === 'return' && act.length) {
+    stats = `<div class="feed-stats two-c">
+      <div class="fs-ret"><small>Қайтарилди</small><b>${fmt(act.reduce((a, d) => a + d.sum, 0))}</b><small>${cur()}</small></div>
+      <div><small>Ҳужжатлар</small><b>${act.length}</b></div>
+    </div>`;
+  }
+  const empty = { sale: 'Бугун ҳали сотув йўқ. Биринчи сотув шу ерда пайдо бўлади.', income: 'Бугун ҳали приход қилинмаган.', transfer: 'Бугун ҳали ўтказма йўқ.', return: 'Бугун ҳали қайтариш йўқ.' }[kind];
   return `<div class="feed-h"><h3>${title}</h3><span>${S.branch ? esc(S.branch) : 'Ҳамма филиаллар'}</span></div>${stats}
     <div class="feed-list">${docs.length ? docs.map(docCard).join('') : `<p class="empty">${empty}</p>`}</div>`;
 }
@@ -667,6 +706,11 @@ function onViewInput(e) {
     if (t.id === 'stock-q') { S.stockQ = t.value; filterStock(); }
     if (t.id === 'h-q') S.hist.q = t.value;
     if (t.id === 'set-q') { S.set.q = t.value; filterSettings(); }
+    if (S.page === 'return') retInput(t);
+    if (t.id === 'r-branch' || t.id === 'r-doctor') {
+      S.rep[t.id === 'r-branch' ? 'branch' : 'doctor'] = t.value;
+      S.rep.data = null; loadReport();
+    }
     return;
   }
   const f = form(kind);
@@ -760,7 +804,7 @@ async function onViewClick(e) {
   } else if (act === 'h-load') {
     readHistFilters(); S.hist.data = null; loadHistory();
   } else if (act === 'r-preset') {
-    S.rep.preset = b.dataset.p; S.rep.data = null; renderView();
+    S.rep.preset = b.dataset.p; S.rep.data = null; S.rep.error = ''; renderView();
   } else if (act === 'r-load') {
     S.rep.from = $('#r-from') ? $('#r-from').value : ''; S.rep.to = $('#r-to') ? $('#r-to').value : '';
     S.rep.data = null; loadReport();
@@ -769,6 +813,24 @@ async function onViewClick(e) {
   } else if (act === 'refresh') {
     b.classList.add('spinning');
     await sync(true); renderView();
+  } else if (act === 'ret-find') {
+    retFind();
+  } else if (act === 'ret-pick') {
+    retPick(b.dataset.doc);
+  } else if (act === 'ret-back') {
+    S.ret.sel = null; renderRet();
+  } else if (act === 'ret-all') {
+    retAll();
+  } else if (act === 'rq-inc' || act === 'rq-dec') {
+    const inp = b.parentElement.querySelector('[data-rq]');
+    inp.value = Math.max(0, num(inp.value) + (act === 'rq-inc' ? 1 : -1));
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (act === 'ret-submit') {
+    retSubmit();
+  } else if (act === 'ret-from') {
+    retFrom(b.dataset.doc);
+  } else if (act === 'xls') {
+    exportExcel(b);
   } else if (act === 'set-tab') {
     S.set.tab = b.dataset.tab; S.set.q = ''; renderView();
   } else if (act === 'set-new') {
@@ -877,6 +939,203 @@ async function cancelDoc(doc) {
   } catch (err) { toast(err.message, 'err'); }
 }
 
+/* ───────────── qaytarish ───────────── */
+
+function retState() {
+  if (!S.ret) S.ret = { q: '', results: null, loading: false, error: '', sel: null, qty: {}, sums: {}, manual: {}, reason: '', rid: uid(), busy: false };
+  return S.ret;
+}
+
+function viewReturn() {
+  const nb = needBranch();
+  if (nb) return nb;
+  const r = retState();
+  return `<div class="work">
+    <section class="panel sheet">
+      <div class="ret-find">
+        <div class="search grow">${ic('search')}<input id="ret-q" value="${esc(r.q)}" placeholder="Чек рақами (С-12 ёки 12) ёки мижоз исми" autocomplete="off" aria-label="Сотувни қидириш"></div>
+        <button class="btn primary" data-act="ret-find">${ic('search')}Топиш</button>
+      </div>
+      <div id="ret-body">${retBody()}</div>
+    </section>
+    <aside class="feed" id="side">${sideHTML('return')}</aside>
+  </div>`;
+}
+
+function renderRet() {
+  const b = $('#ret-body');
+  if (!b) return renderView();
+  b.innerHTML = retBody();
+  retTotals();
+}
+
+function retRemain(l) { return Math.max(0, l.qty - (l.returned || 0)); }
+function retDefSum(l, q) { return l.qty ? Math.round(((l.sum || 0) * q) / l.qty) : 0; }
+
+function retBody() {
+  const r = retState();
+  if (r.sel) return retForm();
+  if (r.loading) return loadingHTML;
+  if (r.error) return `<p class="empty err">${esc(r.error)}</p>`;
+  if (!r.results) {
+    return `<div class="ret-empty">${ic('undo')}<p><b>Мижоз маҳсулот қайтариб келдими?</b><br>Чекдаги рақамни (С-12) ёки мижоз исмини ёзинг. Ҳамма филиаллардаги охирги бир йиллик сотувлар ичидан топилади.</p></div>`;
+  }
+  if (!r.results.length) return '<p class="empty">Бундай сотув топилмади. Чек рақамини ёки исмни текширинг.</p>';
+  return `<div class="sale-list">${r.results.map((d) => {
+    const left = d.lines.reduce((a, l) => a + retRemain(l), 0);
+    const sum = d.lines.reduce((a, l) => a + (l.sum || 0), 0);
+    return `<article class="sale-pick ${left ? '' : 'done'}">
+      <header><b>${esc(d.doc)}</b><span class="muted">${dLabel(d.date)} ${esc(d.time)}</span><span class="br">${esc(d.branch)}</span>
+        ${left ? `<button class="btn primary sm" data-act="ret-pick" data-doc="${esc(d.doc)}">${ic('undo')}Қайтариш</button>` : '<span class="tag gray">Тўлиқ қайтарилган</span>'}</header>
+      <div class="doc-who"><span>${ic('user')}${esc(d.client)}</span>${d.doctor ? `<span>${ic('doctor')}${esc(d.doctor)}</span>` : ''}</div>
+      <ul>${d.lines.map((l) => `<li><span class="nm">${esc(l.product)}</span><span class="q">${fmt(l.qty)} × ${fmt(l.sum)}${l.returned ? ` · <em>қайтарилган ${l.returned}</em>` : ''}</span></li>`).join('')}</ul>
+      <footer><b>${money(sum)}</b><span>${esc(d.op)}</span></footer>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function retForm() {
+  const r = retState();
+  const d = r.sel;
+  return `<div class="ret-head">
+      <div><b>${esc(d.doc)}</b> <span class="muted">· ${dLabel(d.date)} ${esc(d.time)} · ${esc(d.branch)}</span>
+        <div class="doc-who"><span>${ic('user')}${esc(d.client)}</span>${d.doctor ? `<span>${ic('doctor')}${esc(d.doctor)}</span>` : ''}</div></div>
+      <button class="btn soft sm" data-act="ret-back">Бошқа чек</button>
+    </div>
+    <div class="rlines">
+      <div class="rline head" aria-hidden="true"><span>Маҳсулот</span><span class="c">Сотилган</span><span class="c">Қайтариш сони</span><span class="r">Қайтариладиган сумма</span></div>
+      ${d.lines.map((l) => {
+        const rem = retRemain(l);
+        const q = r.qty[l.id] || 0;
+        const sm = r.manual[l.id] ? r.sums[l.id] : retDefSum(l, q);
+        return `<div class="rline ${rem ? '' : 'done'}" data-rline="${l.id}">
+          <div class="rp"><b>${esc(l.product)}</b><small>${fmt(l.qty)} × ${fmt(l.price)} = ${fmt(l.sum)}${l.returned ? ` · аввал қайтарилган: ${l.returned}` : ''}</small></div>
+          <span class="c sold">${fmt(l.qty)}</span>
+          ${rem ? `<div class="qty">
+            <button type="button" data-act="rq-dec" aria-label="Камайтириш">${ic('minus')}</button>
+            <input data-rq="${l.id}" inputmode="numeric" value="${q}" aria-label="${esc(l.product)}: қайтариш сони">
+            <button type="button" data-act="rq-inc" aria-label="Кўпайтириш">${ic('plus')}</button>
+          </div>
+          <input class="money ${r.manual[l.id] ? 'manual' : ''}" data-rs="${l.id}" inputmode="numeric" value="${q ? fmt(sm) : ''}" placeholder="0" aria-label="${esc(l.product)}: қайтариладиган сумма">`
+          : '<span class="c muted">тўлиқ қайтарилган</span><span></span>'}
+        </div>`;
+      }).join('')}
+    </div>
+    <button class="add-line" data-act="ret-all">${ic('undo')}<span>Ҳаммасини қайтариш</span></button>
+    <label class="field note"><span>Қайтариш сабаби <b class="req" title="Мажбурий">*</b></span><input id="ret-reason" value="${esc(r.reason)}" placeholder="Масалан: ёқмади, ножўя таъсир, муддати" autocomplete="off"></label>
+    <div class="checkout ret">
+      <div class="co-l"><span class="co-cap">Мижозга қайтариладиган пул</span><div id="f-total"></div></div>
+      <button class="go" data-act="ret-submit" ${r.busy ? 'disabled' : ''}>${r.busy ? '<span class="spin"></span>Сақланмоқда' : ic('check') + '<span class="d-txt">Қайтаришни расмийлаштириш</span><span class="m-txt">Қайтариш</span>'}</button>
+    </div>`;
+}
+
+function retTotals() {
+  const r = retState();
+  const el = $('#f-total');
+  if (!el || !r.sel) return;
+  let qty = 0; let sum = 0;
+  r.sel.lines.forEach((l) => {
+    const q = r.qty[l.id] || 0;
+    if (!q) return;
+    qty += q;
+    sum += r.manual[l.id] ? (r.sums[l.id] || 0) : retDefSum(l, q);
+  });
+  el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона ${esc(S.branch)} қолдиғига қайтади</span>`;
+}
+
+function retInput(t) {
+  const r = retState();
+  if (t.id === 'ret-q') { r.q = t.value; return; }
+  if (t.id === 'ret-reason') { r.reason = t.value; return; }
+  if (!r.sel) return;
+  if (t.dataset.rq) {
+    const l = r.sel.lines.find((x) => String(x.id) === t.dataset.rq);
+    let q = num(t.value);
+    const rem = retRemain(l);
+    if (q > rem) { q = rem; t.value = q; toast(`«${l.product}»: кўпи билан ${rem} дона қайтариш мумкин`, 'err'); }
+    r.qty[l.id] = q;
+    r.manual[l.id] = false;
+    const sIn = document.querySelector(`[data-rs="${l.id}"]`);
+    if (sIn) { sIn.value = q ? fmt(retDefSum(l, q)) : ''; sIn.classList.remove('manual'); }
+    retTotals();
+  } else if (t.dataset.rs) {
+    const l = r.sel.lines.find((x) => String(x.id) === t.dataset.rs);
+    r.sums[l.id] = num(t.value);
+    r.manual[l.id] = true;
+    t.classList.add('manual');
+    retTotals();
+  }
+}
+
+function retAll() {
+  const r = retState();
+  r.sel.lines.forEach((l) => { r.qty[l.id] = retRemain(l); r.manual[l.id] = false; });
+  renderRet();
+}
+
+async function retFind(autoPick) {
+  const r = retState();
+  const inp = $('#ret-q');
+  if (inp) r.q = inp.value;
+  const q = r.q.trim();
+  if (!q) { toast('Чек рақамини ёки мижоз исмини ёзинг', 'err'); return; }
+  r.loading = true; r.error = ''; r.sel = null; renderRet();
+  try {
+    const j = await api('saleLookup', { q });
+    r.results = j.rows || [];
+  } catch (e) { r.error = e.message; r.results = null; }
+  r.loading = false;
+  if (autoPick && r.results && r.results.length === 1) return retPick(r.results[0].doc);
+  if (S.page === 'return') renderRet();
+}
+
+function retPick(doc) {
+  const r = retState();
+  const d = (r.results || []).find((x) => x.doc === doc);
+  if (!d) return;
+  r.sel = d; r.qty = {}; r.sums = {}; r.manual = {}; r.rid = uid();
+  const open = d.lines.filter((l) => retRemain(l) > 0);
+  if (open.length === 1) r.qty[open[0].id] = Math.min(1, retRemain(open[0]));
+  renderRet();
+  const first = document.querySelector('[data-rq]');
+  if (first) first.focus();
+}
+
+function retFrom(doc) {
+  S.ret = null;
+  retState().q = doc;
+  goPage('return');
+  if (S.branch) retFind(true);
+}
+
+async function retSubmit() {
+  const r = retState();
+  if (r.busy || !r.sel) return;
+  const items = r.sel.lines.filter((l) => (r.qty[l.id] || 0) > 0).map((l) => ({
+    line: l.id, qty: r.qty[l.id], sum: r.manual[l.id] ? (r.sums[l.id] || 0) : retDefSum(l, r.qty[l.id]),
+  }));
+  if (!items.length) return toast('Қайтариладиган маҳсулот сонини ёзинг', 'err');
+  if (!r.reason.trim()) { toast('Қайтариш сабабини ёзинг', 'err'); const i = $('#ret-reason'); if (i) i.focus(); return; }
+  const total = items.reduce((a, x) => a + x.sum, 0);
+  if (!(await modal({
+    title: 'Қайтаришни тасдиқланг',
+    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади. Мижозга <b>${money(total)}</b> қайтарасиз. Маҳсулот <b>${esc(S.branch)}</b> қолдиғига қўшилади.`,
+    ok: 'Қайтариш',
+  }))) return;
+  r.busy = true; renderRet();
+  try {
+    const j = await api('return', { branch: S.branch, ref: r.sel.doc, reason: r.reason, items, rid: r.rid });
+    applyState(j);
+    toast(`Қайтарилди: ${j.doc}, ${money(j.total)}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
+    S.ret = null; S.hist.data = null; S.rep.data = null;
+    renderView();
+    const q = $('#ret-q'); if (q) q.focus();
+  } catch (e) {
+    r.busy = false; renderRet();
+    toast(e.message, 'err');
+  }
+}
+
 /* ───────────── qoldiq ───────────── */
 
 function viewStock() {
@@ -956,7 +1215,7 @@ function viewHistory() {
     <div class="filters">
       ${periodBar('h', h)}
       <div class="f-row">
-        <select id="h-type" aria-label="Тури"><option value="">Ҳамма турлар</option>${[T.OUT, T.IN, T.TR].map((t) => `<option ${h.type === t ? 'selected' : ''} value="${t}">${t === T.OUT ? 'Расход (сотув)' : t}</option>`).join('')}</select>
+        <select id="h-type" aria-label="Тури"><option value="">Ҳамма турлар</option>${[T.OUT, T.RET, T.IN, T.TR].map((t) => `<option ${h.type === t ? 'selected' : ''} value="${t}">${t === T.OUT ? 'Расход (сотув)' : t}</option>`).join('')}</select>
         <div class="search grow">${ic('search')}<input id="h-q" placeholder="Мижоз, врач, маҳсулот ёки ҳужжат рақами" value="${esc(h.q)}" aria-label="Қидирув"></div>
         <button class="btn primary" data-act="h-load">Кўрсатиш</button>
       </div>
@@ -982,7 +1241,7 @@ async function loadHistory() {
   }
 }
 
-function typeTag(t) { return `<span class="tag ${t === T.OUT ? 'leaf' : t === T.IN ? 'sky' : 'plum'}">${t === T.OUT ? 'Сотув' : t}</span>`; }
+function typeTag(t) { return `<span class="tag ${t === T.OUT ? 'leaf' : t === T.IN ? 'sky' : t === T.RET ? 'honey' : 'plum'}">${t === T.OUT ? 'Сотув' : t}</span>`; }
 
 function histTable(d) {
   if (!d || !d.rows.length) return '<p class="empty">Бу даврда ёзув йўқ. Даврни ёки филтрни ўзгартириб кўринг.</p>';
@@ -993,10 +1252,13 @@ function histTable(d) {
   const inQ = act.filter((r) => r.type === T.IN).reduce((a, r) => a + r.qty, 0);
   const trQ = act.filter((r) => r.type === T.TR).reduce((a, r) => a + r.qty, 0);
   const canc = new Set(d.rows.filter((r) => r.status === CANCEL).map((r) => r.doc)).size;
+  const rets = act.filter((r) => r.type === T.RET);
+  const retSum = rets.reduce((a, r) => a + (r.sum || 0), 0);
   const docMap = new Map(groupDocs(d.rows).map((g) => [g.doc, g]));
   const seen = new Set();
-  return `<div class="stats">
-      <div class="st-main"><small>Сотув</small><b>${money(sum)}</b><span>${sDocs} та чек, ${fmt(sales.reduce((a, r) => a + r.qty, 0))} дона</span></div>
+  return `<div class="stats rep">
+      <div class="st-main"><small>Соф тушум</small><b>${money(sum - retSum)}</b><span>${sDocs} та чек, ${fmt(sales.reduce((a, r) => a + r.qty, 0))} дона</span></div>
+      <div><small>Қайтариш</small><b class="${retSum ? 'neg' : ''}">${retSum ? '−' : ''}${fmt(retSum)}</b><span>${new Set(rets.map((r) => r.doc)).size} та, ${fmt(rets.reduce((a, r) => a + r.qty, 0))} дона</span></div>
       <div><small>Приход</small><b>${fmt(inQ)}</b><span>дона</span></div>
       <div><small>Ўтказма</small><b>${fmt(trQ)}</b><span>дона</span></div>
       <div><small>Бекор қилинган</small><b>${canc}</b><span>ҳужжат</span></div>
@@ -1012,10 +1274,10 @@ function histTable(d) {
           <td class="nw b">${first ? esc(r.doc) : ''}</td><td>${first ? typeTag(r.type) : ''}</td>
           <td class="nw">${first ? esc(r.branch) + (r.type === T.TR ? ` <span class="muted">→</span> ${esc(r.to)}` : '') : ''}</td>
           <td>${esc(r.product)}</td><td class="num">${fmt(r.qty)}</td>
-          <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b">${r.sum != null ? fmt(r.sum) : ''}</td>
+          <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b ${r.type === T.RET ? 'neg' : ''}">${r.sum != null ? (r.type === T.RET ? '−' : '') + fmt(r.sum) : ''}</td>
           <td>${first ? esc(r.client) : ''}</td><td>${first ? esc(r.doctor) : ''}</td><td class="nw muted">${first ? esc(r.op) : ''}</td>
-          <td class="note">${first ? esc(r.note) : ''}</td>
-          <td>${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
+          <td class="note">${first ? (r.ref ? `<b>Асос: ${esc(r.ref)}</b>${r.note ? ' · ' : ''}` : '') + esc(r.note) : ''}</td>
+          <td class="acts">${first && g && g.type === T.OUT && g.status !== CANCEL ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
@@ -1031,10 +1293,15 @@ function viewReport() {
   else if (r.data && !r.loading) body = repBody(r.data);
   return `<section class="panel">
     <div class="filters noprint">
-      <div class="f-row">${periodBar('r', r)}${r.preset === 'custom' ? '<button class="btn primary sm" data-act="r-load">Кўрсатиш</button>' : ''}
-        <button class="btn soft sm push" data-act="print">${ic('print')}Чоп этиш</button></div>
+      <div class="f-row">${periodBar('r', r)}${r.preset === 'custom' ? '<button class="btn primary sm" data-act="r-load">Кўрсатиш</button>' : ''}</div>
+      <div class="f-row">
+        <label class="sel-f">${ic('pin')}<select id="r-branch" aria-label="Филиал"><option value="">Ҳамма филиаллар</option>${branchNames().map((b) => `<option ${b === r.branch ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
+        <label class="sel-f">${ic('doctor')}<select id="r-doctor" aria-label="Врач"><option value="">Ҳамма врачлар</option>${(S.cfg.doctors || []).map((x) => `<option ${x === r.doctor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+        <button class="btn primary push" data-act="xls" ${r.data ? '' : 'disabled'}>${ic('download')}Excel юклаб олиш</button>
+        <button class="btn soft" data-act="print">${ic('print')}Чоп этиш</button>
+      </div>
     </div>
-    <p class="range-cap">Ҳисобот, ${rangeLabel(from, to)}</p>
+    <p class="range-cap">Ҳисобот, ${rangeLabel(from, to)}${r.branch ? ' · ' + esc(r.branch) : ''}${r.doctor ? ' · ' + esc(r.doctor) : ''}</p>
     <div id="r-body">${body}</div>
   </section>`;
 }
@@ -1045,19 +1312,22 @@ async function loadReport() {
   if ($('#r-to')) r.to = $('#r-to').value;
   const [from, to] = presetRange(r.preset, r.from, r.to);
   r.loading = true; r.error = '';
-  try { r.data = await api('report', { from, to }); } catch (e) { r.error = e.message; r.data = null; }
+  const cap = $('#r-body'); if (cap) cap.innerHTML = loadingHTML;
+  try { r.data = await api('report', { from, to, branch: r.branch, doctor: r.doctor }); } catch (e) { r.error = e.message; r.data = null; }
   r.loading = false;
-  if (S.page === 'report') {
-    const b = $('#r-body');
-    if (b) b.innerHTML = r.error ? `<p class="empty err">${esc(r.error)}</p>` : repBody(r.data);
-  }
+  if (S.page === 'report') renderView();
+}
+
+function repBranches(d) {
+  if (d.filter && d.filter.branch) return [d.filter.branch];
+  return branchNames().concat(Object.keys(d.byBranch).filter((b) => !branchNames().includes(b)));
 }
 
 function bar(v, max) { return `<span class="bar"><i style="width:${max ? Math.max(2, Math.round((v / max) * 100)) : 0}%"></i></span>`; }
 
 function repBody(d) {
   const t = d.tot;
-  const brs = branchNames().concat(Object.keys(d.byBranch).filter((b) => !branchNames().includes(b)));
+  const brs = repBranches(d);
   const bMax = Math.max(0, ...brs.map((b) => (d.byBranch[b] || {}).sum || 0));
   const prods = Object.entries(d.byProduct).sort((a, b) => b[1].sum - a[1].sum);
   const pMax = Math.max(0, ...prods.map((p) => p[1].sum));
@@ -1067,29 +1337,30 @@ function repBody(d) {
   const dyMax = Math.max(0, ...days.map((x) => x[1].sum));
   const mprods = Object.keys(d.matrix);
   return `
-  <div class="stats rep">
-    <div class="st-main"><small>Сотув суммаси</small><b>${money(t.sum)}</b><span>${fmt(t.docs)} та чек, ўртача ${t.docs ? fmt(t.sum / t.docs) : 0}</span></div>
-    <div><small>Сотилган</small><b>${fmt(t.qty)}</b><span>дона</span></div>
+  <div class="stats rep6">
+    <div class="st-main"><small>Соф тушум</small><b>${money(t.sum)}</b><span>сотув ${fmt(t.gross)} − қайтариш ${fmt(t.retSum)}</span></div>
+    <div><small>Чеклар</small><b>${fmt(t.docs)}</b><span>ўртача ${t.docs ? fmt(t.gross / t.docs) : 0}</span></div>
+    <div><small>Сотилган (соф)</small><b>${fmt(t.qty)}</b><span>дона</span></div>
+    <div><small>Қайтариш</small><b class="${t.retSum ? 'neg' : ''}">${t.retSum ? '−' : ''}${fmt(t.retSum)}</b><span>${fmt(t.retDocs)} та, ${fmt(t.retQty)} дона</span></div>
     <div><small>Мижозлар</small><b>${fmt(t.clients)}</b><span>киши</span></div>
-    <div><small>Приход</small><b>${fmt(t.inQty)}</b><span>дона</span></div>
-    <div><small>Ўтказма</small><b>${fmt(t.trQty)}</b><span>дона, бекор: ${t.cancelled}</span></div>
+    <div><small>Приход · Ўтказма</small><b>${fmt(t.inQty)} · ${fmt(t.trQty)}</b><span>дона, бекор: ${t.cancelled}</span></div>
   </div>
 
   <h3 class="sec">Филиаллар</h3>
   <div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Филиал</th><th class="num">Сотув</th><th class="w"></th><th class="num">Чек</th><th class="num">Дона</th><th class="num">Приход</th><th class="num">Ўтказма кирди</th><th class="num">Ўтказма чиқди</th><th class="num">Ҳозирги қолдиқ</th></tr></thead>
+    <thead><tr><th>Филиал</th><th class="num">Соф тушум</th><th class="w"></th><th class="num">Сотув</th><th class="num">Қайтариш</th><th class="num">Чек</th><th class="num">Дона</th><th class="num">Приход</th><th class="num">Ўтказма кирди</th><th class="num">Ўтказма чиқди</th><th class="num">Ҳозирги қолдиқ</th></tr></thead>
     <tbody>${brs.map((b) => {
-      const x = d.byBranch[b] || { sum: 0, docs: 0, qty: 0, inQty: 0, trIn: 0, trOut: 0 };
+      const x = d.byBranch[b] || { sum: 0, gross: 0, retSum: 0, docs: 0, qty: 0, inQty: 0, trIn: 0, trOut: 0 };
       const st = (S.cfg.products || []).reduce((a, p) => a + stockOf(b, p.name), 0);
-      return `<tr><td class="b">${esc(b)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, bMax)}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num">${fmt(x.inQty)}</td><td class="num">${fmt(x.trIn)}</td><td class="num">${fmt(x.trOut)}</td><td class="num">${fmt(st)}</td></tr>`;
+      return `<tr><td class="b">${esc(b)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, bMax)}</td><td class="num">${fmt(x.gross)}</td><td class="num ${x.retSum ? 'neg' : 'muted'}">${x.retSum ? '−' + fmt(x.retSum) : 0}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num">${fmt(x.inQty)}</td><td class="num">${fmt(x.trIn)}</td><td class="num">${fmt(x.trOut)}</td><td class="num">${fmt(st)}</td></tr>`;
     }).join('')}</tbody>
   </table></div>
 
   <div class="two">
     <div>
       <h3 class="sec">Маҳсулотлар</h3>
-      ${prods.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th><th class="num">Дона</th><th class="num">Сумма</th><th class="w"></th></tr></thead>
-        <tbody>${prods.map(([n, x]) => `<tr><td>${esc(n)}</td><td class="num">${fmt(x.qty)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, pMax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда сотув йўқ</p>'}
+      ${prods.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th><th class="num">Дона (соф)</th><th class="num">Қайтарилган</th><th class="num">Сумма (соф)</th><th class="w"></th></tr></thead>
+        <tbody>${prods.map(([n, x]) => `<tr><td>${esc(n)}</td><td class="num">${fmt(x.qty)}</td><td class="num ${x.ret ? 'neg' : 'muted'}">${fmt(x.ret || 0)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, pMax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда сотув йўқ</p>'}
     </div>
     <div>
       <h3 class="sec">Юборган врачлар</h3>
@@ -1098,13 +1369,237 @@ function repBody(d) {
     </div>
   </div>
 
-  ${mprods.length ? `<h3 class="sec">Сотилган дона: маҳсулот ва филиал</h3>
+  ${mprods.length ? `<h3 class="sec">Сотилган дона (соф): маҳсулот ва филиал</h3>
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th>${brs.map((b) => `<th class="num">${esc(b)}</th>`).join('')}<th class="num">Жами</th></tr></thead>
     <tbody>${mprods.map((p) => { const row = brs.map((b) => d.matrix[p][b] || 0); return `<tr><td>${esc(p)}</td>${row.map((q) => `<td class="num ${q ? '' : 'muted'}">${fmt(q)}</td>`).join('')}<td class="num b">${fmt(row.reduce((a, c) => a + c, 0))}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
 
   ${days.length > 1 ? `<h3 class="sec">Кунлар</h3>
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Сана</th><th class="num">Чек</th><th class="num">Дона</th><th class="num">Сумма</th><th class="w"></th></tr></thead>
     <tbody>${days.map(([dt, x]) => `<tr><td class="nw">${dLabel(dt)}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, dyMax)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+}
+
+/* ───────────── Excel (ExcelJS, faqat bosilganda yuklanadi) ───────────── */
+
+let xlsLib = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (xlsLib) return xlsLib;
+  xlsLib = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'vendor/exceljs.min.js';
+    sc.onload = () => resolve(window.ExcelJS);
+    sc.onerror = () => { xlsLib = null; reject(new Error('Excel кутубхонаси юкланмади — интернетни текширинг')); };
+    document.head.appendChild(sc);
+  });
+  return xlsLib;
+}
+
+const XL = {
+  forest: 'FF12382D', leaf: 'FF1E9E63', mint: 'FFEDF4EF', line: 'FFDDE8E1', honey: 'FFFDF1DC',
+  red: 'FFD9493F', redSoft: 'FFFCE9E7', grey: 'FF8A9A93', white: 'FFFFFFFF', ink: 'FF17302A',
+};
+const XL_TYPE_FILL = { 'Расход': 'FFE3F4EA', 'Қайтариш': 'FFFDF1DC', 'Приход': 'FFE5F0FA', 'Ўтказма': 'FFEFE8F8' };
+
+function xlDate(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+
+/** Чиройли жадвал: сарлавҳа, қаторлар, жами, филтр, қотирилган сарлавҳа */
+function xlTable(ws, { title, sub, cols, rows, total, startRow = 1 }) {
+  let r = startRow;
+  const n = cols.length;
+  if (title) {
+    ws.mergeCells(r, 1, r, n);
+    const c = ws.getCell(r, 1);
+    c.value = title; c.font = { bold: true, size: 15, color: { argb: XL.forest } };
+    ws.getRow(r).height = 24; r++;
+  }
+  if (sub) {
+    ws.mergeCells(r, 1, r, n);
+    const c = ws.getCell(r, 1);
+    c.value = sub; c.font = { size: 10, color: { argb: XL.grey } };
+    r++;
+  }
+  if (title || sub) r++;
+  const hr = r;
+  const head = ws.getRow(hr);
+  cols.forEach((col, i) => {
+    const c = head.getCell(i + 1);
+    c.value = col.h;
+    c.font = { bold: true, color: { argb: XL.white } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.forest } };
+    c.alignment = { vertical: 'middle', horizontal: col.num ? 'right' : 'left', wrapText: true };
+    c.border = { bottom: { style: 'thin', color: { argb: XL.forest } } };
+    ws.getColumn(i + 1).width = col.w || 14;
+  });
+  head.height = 22;
+  rows.forEach((vals, k) => {
+    const row = ws.getRow(hr + 1 + k);
+    vals.forEach((v, i) => {
+      const c = row.getCell(i + 1);
+      c.value = v == null ? '' : v;
+      const col = cols[i];
+      if (col.num) { c.numFmt = col.fmt || '#,##0'; c.alignment = { horizontal: 'right' }; }
+      if (col.date) c.numFmt = 'dd.mm.yyyy';
+      c.border = { bottom: { style: 'hair', color: { argb: XL.line } } };
+    });
+    if (k % 2 === 1) row.eachCell({ includeEmpty: true }, (c) => { if (!c.fill || c.fill.type !== 'pattern') c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBF9' } }; });
+  });
+  const last = hr + rows.length;
+  if (total && rows.length) {
+    const tr = ws.getRow(last + 1);
+    cols.forEach((col, i) => {
+      const c = tr.getCell(i + 1);
+      const letter = ws.getColumn(i + 1).letter;
+      if (i === 0) c.value = 'Жами';
+      else if (col.sum) c.value = { formula: `SUBTOTAL(9,${letter}${hr + 1}:${letter}${last})` };
+      if (col.num) { c.numFmt = col.fmt || '#,##0'; c.alignment = { horizontal: 'right' }; }
+      c.font = { bold: true, color: { argb: XL.forest } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.mint } };
+      c.border = { top: { style: 'thin', color: { argb: XL.forest } } };
+    });
+  }
+  ws.autoFilter = { from: { row: hr, column: 1 }, to: { row: Math.max(hr, last), column: n } };
+  ws.views = [{ state: 'frozen', ySplit: hr, xSplit: 0, showGridLines: false }];
+  return { headRow: hr, lastRow: last };
+}
+
+async function exportExcel(btn) {
+  const r = S.rep;
+  const d = r.data;
+  if (!d) return;
+  const [from, to] = [d.from, d.to];
+  const old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Тайёрланмоқда';
+  try {
+    const [ExcelJS, ex] = await Promise.all([
+      loadExcelJS(),
+      api('exportRows', { from, to, branch: r.branch, doctor: r.doctor }),
+    ]);
+    const wb = new ExcelJS.Workbook();
+    wb.creator = S.user.name; wb.created = new Date();
+    const net = S.cfg.name;
+    const period = rangeLabel(from, to);
+    const filt = `Давр: ${period} · Филиал: ${r.branch || 'ҳаммаси'} · Врач: ${r.doctor || 'ҳаммаси'} · Тузилди: ${dLabel(todayISO())} ${hm(Date.now())}, ${S.user.name}`;
+    const t = d.tot;
+    const brs = repBranches(d);
+
+    // 1. Умумий
+    const w1 = wb.addWorksheet('Ҳисобот', { properties: { tabColor: { argb: XL.forest } } });
+    xlTable(w1, {
+      title: `${net} — ҳисобот`, sub: filt,
+      cols: [{ h: 'Кўрсаткич', w: 34 }, { h: 'Қиймат', w: 20, num: true }, { h: 'Изоҳ', w: 40 }],
+      rows: [
+        ['Сотув (қайтаришсиз)', t.gross, cur()],
+        ['Қайтариш', -t.retSum, `${t.retDocs} та ҳужжат, ${t.retQty} дона`],
+        ['Соф тушум', t.sum, cur()],
+        ['Чеклар сони', t.docs, ''],
+        ['Ўртача чек', t.docs ? Math.round(t.gross / t.docs) : 0, cur()],
+        ['Сотилган дона (соф)', t.qty, `сотилган ${t.soldQty}, қайтарилган ${t.retQty}`],
+        ['Мижозлар', t.clients, 'киши'],
+        ['Приход', t.inQty, 'дона'],
+        ['Ўтказма', t.trQty, 'дона'],
+        ['Бекор қилинган ҳужжатлар', t.cancelled, ''],
+      ],
+    });
+    const netRow = w1.getRow(7);
+    netRow.eachCell((c) => { c.font = { bold: true, size: 12, color: { argb: XL.forest } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.honey } }; });
+    w1.getCell('B6').font = { color: { argb: XL.red } };
+
+    // 2. Филиаллар
+    const w2 = wb.addWorksheet('Филиаллар');
+    xlTable(w2, {
+      title: 'Филиаллар бўйича', sub: filt,
+      cols: [{ h: 'Филиал', w: 28 }, { h: 'Сотув', w: 15, num: true, sum: true }, { h: 'Қайтариш', w: 14, num: true, sum: true },
+        { h: 'Соф тушум', w: 16, num: true, sum: true }, { h: 'Чеклар', w: 10, num: true, sum: true }, { h: 'Дона (соф)', w: 12, num: true, sum: true },
+        { h: 'Приход', w: 11, num: true, sum: true }, { h: 'Ўтказма кирди', w: 13, num: true, sum: true }, { h: 'Ўтказма чиқди', w: 13, num: true, sum: true },
+        { h: 'Ҳозирги қолдиқ', w: 14, num: true, sum: true }],
+      rows: brs.map((b) => {
+        const x = d.byBranch[b] || {};
+        const st = (S.cfg.products || []).reduce((a, p) => a + stockOf(b, p.name), 0);
+        return [b, x.gross || 0, -(x.retSum || 0), x.sum || 0, x.docs || 0, x.qty || 0, x.inQty || 0, x.trIn || 0, x.trOut || 0, st];
+      }),
+      total: true,
+    });
+
+    // 3. Маҳсулотлар
+    const prods = Object.entries(d.byProduct).sort((a, b) => b[1].sum - a[1].sum);
+    xlTable(wb.addWorksheet('Маҳсулотлар'), {
+      title: 'Маҳсулотлар бўйича', sub: filt,
+      cols: [{ h: '№', w: 5, num: true, fmt: '0' }, { h: 'Маҳсулот', w: 42 }, { h: 'Сотилган дона (соф)', w: 16, num: true, sum: true },
+        { h: 'Қайтарилган дона', w: 15, num: true, sum: true }, { h: 'Соф сумма', w: 16, num: true, sum: true }],
+      rows: prods.map(([n, x], i) => [i + 1, n, x.qty, x.ret || 0, x.sum]),
+      total: true,
+    });
+
+    // 4. Врачлар
+    const docs = Object.entries(d.byDoctor).sort((a, b) => b[1].sum - a[1].sum);
+    xlTable(wb.addWorksheet('Врачлар'), {
+      title: 'Юборган врачлар бўйича', sub: filt,
+      cols: [{ h: '№', w: 5, num: true, fmt: '0' }, { h: 'Врач', w: 30 }, { h: 'Чеклар', w: 10, num: true, sum: true },
+        { h: 'Дона (соф)', w: 12, num: true, sum: true }, { h: 'Соф сумма', w: 16, num: true, sum: true }],
+      rows: docs.map(([n, x], i) => [i + 1, n, x.docs, x.qty, x.sum]),
+      total: true,
+    });
+
+    // 5. Кунлар
+    const days = Object.entries(d.byDay).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    xlTable(wb.addWorksheet('Кунлар'), {
+      title: 'Кунлар бўйича', sub: filt,
+      cols: [{ h: 'Сана', w: 13, date: true }, { h: 'Чеклар', w: 10, num: true, sum: true }, { h: 'Дона (соф)', w: 12, num: true, sum: true }, { h: 'Соф сумма', w: 16, num: true, sum: true }],
+      rows: days.map(([dt, x]) => [xlDate(dt), x.docs, x.qty, x.sum]),
+      total: true,
+    });
+
+    // 6. Матрица
+    const mp = Object.keys(d.matrix).sort();
+    xlTable(wb.addWorksheet('Маҳсулот×Филиал'), {
+      title: 'Сотилган дона (соф): маҳсулот ва филиал', sub: filt,
+      cols: [{ h: 'Маҳсулот', w: 40 }].concat(brs.map((b) => ({ h: b, w: 16, num: true, sum: true })), [{ h: 'Жами', w: 10, num: true, sum: true }]),
+      rows: mp.map((p) => { const q = brs.map((b) => d.matrix[p][b] || 0); return [p].concat(q, [q.reduce((a, c) => a + c, 0)]); }),
+      total: true,
+    });
+
+    // 7. Ҳаракатлар (батафсил)
+    const w7 = wb.addWorksheet('Ҳаракатлар', { properties: { tabColor: { argb: XL.leaf } } });
+    const cols7 = [{ h: 'Сана', w: 11, date: true }, { h: 'Вақт', w: 7 }, { h: 'Ҳужжат', w: 9 }, { h: 'Тури', w: 11 },
+      { h: 'Филиал', w: 24 }, { h: 'Қаерга', w: 20 }, { h: 'Маҳсулот', w: 36 }, { h: 'Сони', w: 7, num: true, sum: true },
+      { h: 'Нарх', w: 11, num: true }, { h: 'Сумма', w: 13, num: true, sum: true }, { h: 'Мижоз Ф.И.Ш', w: 24 }, { h: 'Юборган врач', w: 18 },
+      { h: 'Ҳолат', w: 8 }, { h: 'Оператор', w: 13 }, { h: 'Изоҳ', w: 34 }, { h: 'Асос ҳужжат', w: 11 }];
+    const rows7 = ex.rows.map((x) => {
+      const ret = x[3] === T.RET;
+      return [xlDate(x[0]), x[1], x[2], x[3], x[4], x[5], x[6], ret ? -x[7] : x[7], x[8], x[9] == null ? null : (ret ? -x[9] : x[9]), x[10], x[11], x[12], x[13], x[14], x[15]];
+    });
+    const pos = xlTable(w7, {
+      title: 'Ҳамма ҳаракатлар', sub: filt + ' · Қайтариш манфий (−) ёзилган, «Сумма» устуни жами — соф тушум',
+      cols: cols7, rows: rows7, total: true,
+    });
+    ex.rows.forEach((x, k) => {
+      const row = w7.getRow(pos.headRow + 1 + k);
+      const tc = row.getCell(4);
+      tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_TYPE_FILL[x[3]] || XL.white } };
+      if (x[3] === T.RET) [8, 10].forEach((i) => { row.getCell(i).font = { color: { argb: XL.red } }; });
+      if (x[12] === CANCEL) row.eachCell({ includeEmpty: true }, (c) => { c.font = { italic: true, strike: true, color: { argb: XL.grey } }; });
+      row.getCell(15).alignment = { wrapText: true, vertical: 'top' };
+    });
+    if (ex.total > ex.rows.length) {
+      const c = w7.getCell(pos.lastRow + 3, 1);
+      c.value = `Диққат: биринчи ${ex.rows.length} та қатор олинди (жами ${ex.total}). Даврни қисқартиринг.`;
+      c.font = { bold: true, color: { argb: XL.red } };
+    }
+
+    wb.eachSheet((ws) => { ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 }; });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const name = `Ҳисобот_${from}_${to}${r.branch ? '_' + r.branch : ''}${r.doctor ? '_' + r.doctor : ''}.xlsx`.replace(/[\\/:*?"<>|]+/g, ' ');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast(`Excel тайёр: ${ex.rows.length} та қатор`, 'ok');
+  } catch (e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.innerHTML = old;
+  }
 }
 
 /* ───────────── sozlamalar (admin) ───────────── */
