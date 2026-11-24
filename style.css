@@ -476,6 +476,84 @@ input[type="date"] { width: auto; }
 .doc-who.muted { color: var(--muted); }
 .doc footer b.neg { color: var(--red); }
 
+
+/* ── to'lov turi, qarz, chegirma (sotuv) ── */
+.payblock { margin-top: 22px; display: flex; flex-direction: column; gap: 12px; }
+.pb-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pb-cap { font-size: 13px; font-weight: 600; color: var(--muted); min-width: 92px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; color: var(--forest); font-weight: 600; font-size: 14px; transition: border-color .15s, background .15s, color .15s; }
+.chip .ic { width: 17px; height: 17px; color: var(--muted); }
+.chip:hover { border-color: #c5d8cc; }
+.chip.on { border-color: var(--leaf); background: var(--leaf-soft); color: var(--leaf-d); }
+.chip.on .ic { color: var(--leaf); }
+.chip.k-debt.on { border-color: var(--honey); background: var(--honey-soft); color: var(--honey-d); }
+.chip.k-debt.on .ic { color: var(--honey-d); }
+.subbox { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; padding: 14px; border-radius: 16px; }
+.subbox .grow { grid-column: auto; }
+.debt-box { background: var(--honey-soft); }
+.disc-box { background: var(--plum-soft); grid-template-columns: 190px minmax(0, 1fr); }
+.subbox input { background: #fff; }
+.switch { align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; border: 0; background: transparent; padding: 4px 2px; font-weight: 600; color: var(--forest); }
+.switch i { position: relative; width: 38px; height: 22px; border-radius: 999px; background: #cfdcd4; transition: background .15s; flex: none; }
+.switch i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .18s var(--ease); }
+.switch.on i { background: var(--plum); }
+.switch.on i::after { transform: translateX(16px); }
+.switch .ic { width: 17px; height: 17px; color: var(--plum); }
+.money.locked, .money.locked:hover, .money.locked:focus { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); cursor: not-allowed; }
+.money.calc, .money.calc:hover, .money.calc:focus { background: transparent; border-color: transparent; box-shadow: none; font-weight: 650; color: var(--forest); cursor: default; }
+.checkout.debt { background: #4a3510; }
+.checkout.debt .co-cap, .checkout.debt #f-total .sub { color: #e8cf9f; }
+.ptag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px 2px 6px; border-radius: 999px; background: var(--field); color: var(--forest); white-space: nowrap; }
+.ptag .ic { width: 14px; height: 14px; color: var(--muted); }
+.ptag.k-debt { background: var(--honey-soft); color: var(--honey-d); }
+.ptag.k-debt .ic { color: var(--honey-d); }
+.ptag.k-card .ic, .ptag.k-transfer .ic { color: var(--sky); }
+.ptag.k-cash .ic { color: var(--leaf); }
+.doc footer .ptag { margin-left: auto; margin-right: 8px; }
+.doc-who.disc { color: var(--plum); }
+.doc-who.disc .ic { color: var(--plum); }
+.feed-stats em.dbt { color: var(--honey-d); }
+.disc, b.disc, td.disc { color: var(--plum) !important; }
+.discn { color: var(--plum); font-weight: 600; }
+.pos { color: var(--leaf-d) !important; }
+
+/* ── qarzdorlar ── */
+.stats .st-late { background: var(--red-soft); }
+.stats .st-late b { color: var(--red); }
+.stats .st-soon { background: var(--honey-soft); }
+.stats .st-soon b { color: var(--honey-d); }
+.debt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.debt-c { border: 1.5px solid var(--line); border-radius: 18px; padding: 15px 16px; display: flex; flex-direction: column; gap: 9px; background: #fff; }
+.debt-c.late { border-color: #f0b9b4; box-shadow: inset 4px 0 0 var(--red); }
+.debt-c.soon { border-color: #f1d3a0; box-shadow: inset 4px 0 0 var(--honey); }
+.debt-c.done { opacity: .7; }
+.debt-c header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.debt-c .cl { font-size: 16px; color: var(--forest); }
+.due { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; background: var(--field); color: var(--muted); }
+.due .ic { width: 14px; height: 14px; }
+.due.late { background: var(--red-soft); color: var(--red); }
+.due.soon { background: var(--honey-soft); color: var(--honey-d); }
+.due.ok { background: var(--leaf-soft); color: var(--leaf-d); }
+.debt-c .meta { font-size: 13px; color: var(--muted); }
+.dnote { display: flex; gap: 7px; margin: 0; font-size: 13.5px; color: var(--ink); background: var(--field); padding: 8px 10px; border-radius: 10px; }
+.dnote .ic { width: 16px; height: 16px; color: var(--muted); margin-top: 1px; }
+.prog { height: 7px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--leaf); border-radius: 999px; }
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-weight: 650; color: var(--forest); font-variant-numeric: tabular-nums; }
+.nums small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.nums .lft { color: var(--honey-d); font-size: 17px; }
+.debt-c.late .nums .lft { color: var(--red); }
+.dh summary { cursor: pointer; font-size: 13px; color: var(--leaf-d); font-weight: 600; }
+.dh ul { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+.dh li { display: grid; grid-template-columns: 100px 1fr auto auto; gap: 8px; align-items: center; padding: 4px 0; border-top: 1px dashed var(--line); }
+.dh li b { font-variant-numeric: tabular-nums; }
+.debt-c footer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+
+/* ── moliya ── */
+.stats.rep6.fin .st-main b { font-size: 26px; }
+.fin-t td.note { max-width: 320px; }
+
 /* hisobot filtrlari */
 .tbl td.b { white-space: nowrap; }
 .m-txt { display: none; }
@@ -552,6 +630,12 @@ input.inline.saved { border-color: var(--leaf); background: var(--leaf-soft); }
   .shell { display: block; }
   .rail { display: none; }
   .m-only { display: grid !important; }
+  .subbox, .disc-box { grid-template-columns: 1fr; }
+  .pb-cap { min-width: 0; width: 100%; }
+  .chip { height: 42px; }
+  .debt-grid { grid-template-columns: 1fr; }
+  .dh li { grid-template-columns: 1fr auto; }
+
   .d-txt { display: none; }
   .m-txt { display: inline; }
   .stage { padding: 12px 12px calc(92px + env(safe-area-inset-bottom)); }

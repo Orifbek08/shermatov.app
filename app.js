@@ -16,7 +16,9 @@ const PAGES = [
   { id: 'income', t: 'Приход', ic: 'income', sub: 'Филиалга келган товарни қолдиққа қўшиш', more: true },
   { id: 'transfer', t: 'Ўтказма', ic: 'transfer', sub: 'Бир филиалдан бошқасига товар ўтказиш', more: true },
   { id: 'stock', t: 'Қолдиқ', ic: 'box', sub: 'Ҳамма филиаллардаги қолдиқ' },
-  { id: 'return', t: 'Қайтариш', ic: 'undo', sub: 'Мижоз қайтариб келган маҳсулотни қабул қилиш (фақат сотилган филиалда)' },
+  { id: 'return', t: 'Қайтариш', ic: 'undo', sub: 'Мижоз қайтариб келган маҳсулотни қабул қилиш (фақат сотилган филиалда)', more: true },
+  { id: 'debts', t: 'Қарздорлар', ic: 'debt', sub: 'Қарзга олганлар: тўлаш санаси яқинлари тепада' },
+  { id: 'finance', t: 'Молия', ic: 'wallet', sub: 'Кирим, чиқим ва касса — ҳар филиал алоҳида', more: true },
   { id: 'history', t: 'Тарих', ic: 'clock', sub: 'Ҳамма ёзувлар, қидирув ва бекор қилиш' },
   { id: 'report', t: 'Ҳисобот', ic: 'chart', sub: 'Сотув, қайтариш, приход ва врачлар бўйича · Excel', admin: true, more: true },
   { id: 'settings', t: 'Созламалар', ic: 'gear', sub: 'Маҳсулотлар, нархлар, филиаллар, врачлар ва фойдаланувчилар', admin: true, more: true },
@@ -49,6 +51,14 @@ const ICONS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
   note: '<path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
   pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><path d="M4 7.5v10A2.5 2.5 0 0 0 6.5 20H20V8H6.5A2.5 2.5 0 0 1 4 5.5"/><circle cx="16" cy="14" r="1.3"/>',
+  cash: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 9.5v5M17.5 9.5v5"/>',
+  card: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/>',
+  bank: '<path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7M4 19.5h16"/>',
+  debt: '<path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/>',
+  tag: '<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.4"/>',
+  cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   undo: '<path d="M9 14.5 4 9.5l5-5"/><path d="M4 9.5h10.5a5.5 5.5 0 0 1 0 11H10"/>',
   more: '<circle cx="5.5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18.5" cy="12" r="1.5"/>',
   download: '<path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
@@ -64,6 +74,8 @@ const S = {
   hist: { preset: 'today', from: '', to: '', type: '', q: '', data: null, loading: false },
   rep: { preset: 'month', from: '', to: '', branch: '', doctor: '', data: null, loading: false },
   ret: null,
+  fin: { preset: 'today', from: '', to: '', data: null, loading: false, error: '' },
+  debts: { status: 'open', q: '', data: null, loading: false, error: '' },
   stockQ: '',
   set: { tab: 'products', data: null, loading: false, q: '' },
 };
@@ -107,6 +119,11 @@ function presetRange(p, from, to) {
 }
 function rangeLabel(from, to) { return from === to ? dLabel(from) : `${dLabel(from)} – ${dLabel(to)}`; }
 
+function payTypes() { return (S.cfg && S.cfg.payTypes) || []; }
+function payKind(name) { const p = payTypes().find((x) => x.name === name); return p ? p.kind : ''; }
+function payIcon(kind) { return { cash: 'cash', card: 'card', transfer: 'bank', debt: 'debt' }[kind] || 'wallet'; }
+function moneyPays() { return payTypes().filter((p) => p.kind !== 'debt'); }
+function payTag(name) { return name ? `<span class="ptag k-${payKind(name) || 'none'}">${ic(payIcon(payKind(name)))}${esc(name)}</span>` : ''; }
 function product(name) { return (S.cfg.products || []).find((p) => p.name === name); }
 function stockOf(branch, prod) { return (S.stock[branch] && S.stock[branch][prod]) || 0; }
 function branchNames() { return (S.cfg.branches || []).map((b) => b.name); }
@@ -318,7 +335,7 @@ function renderApp() {
   const bs = $('#branch-sel');
   if (bs) bs.onchange = () => {
     S.branch = bs.value; lsSet(LS.branch, S.branch);
-    S.hist.data = null;
+    S.hist.data = null; S.fin.data = null; S.debts.data = null; S.fin.error = ''; S.debts.error = '';
     renderView(true);
   };
   renderView(true);
@@ -326,6 +343,8 @@ function renderApp() {
 
 function goPage(id) {
   if (id === S.page) return;
+  if (id === 'debts') { S.debts.data = null; S.debts.error = ''; }
+  if (id === 'finance') { S.fin.data = null; S.fin.error = ''; }
   S.page = id; lsSet(LS.page, S.page);
   document.querySelectorAll('[data-page]').forEach((x) => {
     const on = x.dataset.page === S.page;
@@ -356,7 +375,7 @@ function openMore(list) {
 function renderView(animate) {
   const v = $('#view');
   if (!v) return;
-  const fn = { sale: viewSale, return: viewReturn, income: viewIncome, transfer: viewTransfer, stock: viewStock, history: viewHistory, report: viewReport, settings: viewSettings }[S.page];
+  const fn = { sale: viewSale, return: viewReturn, income: viewIncome, transfer: viewTransfer, stock: viewStock, debts: viewDebts, finance: viewFinance, history: viewHistory, report: viewReport, settings: viewSettings }[S.page];
   v.innerHTML = fn ? fn() : '';
   if (animate) { v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter'); }
   if (isForm(S.page) && $('#f-total')) {
@@ -386,6 +405,8 @@ function after() {
   if (S.page === 'history' && !S.hist.data && !S.hist.loading) loadHistory();
   if (S.page === 'report' && !S.rep.data && !S.rep.loading && !S.rep.error) loadReport();
   if (S.page === 'settings' && !S.set.data && !S.set.loading) loadSettings();
+  if (S.page === 'debts' && !S.debts.data && !S.debts.loading && !S.debts.error) loadDebts();
+  if (S.page === 'finance' && !S.fin.data && !S.fin.loading && !S.fin.error) loadFinance();
 }
 
 /* ───────────── filial tanlash (admin) ───────────── */
@@ -404,7 +425,11 @@ function needBranch() {
 
 function newLine() { return { product: '', text: '', qty: '1', price: '', sum: '', manual: false }; }
 function form(id) {
-  if (!S.forms[id]) S.forms[id] = { lines: [newLine()], client: '', doctor: '', note: '', to: '', rid: uid(), busy: false };
+  if (!S.forms[id]) {
+    const p0 = (moneyPays()[0] || payTypes()[0] || {}).name || '';
+    S.forms[id] = { lines: [newLine()], client: '', doctor: '', note: '', to: '', rid: uid(), busy: false,
+      pay: p0, debtNote: '', due: '', disc: false, discSum: '', discNote: '' };
+  }
   return S.forms[id];
 }
 
@@ -421,8 +446,8 @@ function linesHTML(kind) {
         <input data-f="qty" data-i="${i}" inputmode="numeric" value="${esc(l.qty)}" aria-label="Сони">
         <button type="button" data-act="qty-inc" data-i="${i}" aria-label="Кўпайтириш">${ic('plus')}</button>
       </div>
-      ${sale ? `<input class="money" data-f="price" data-i="${i}" inputmode="numeric" value="${l.price === '' ? '' : fmt(l.price)}" aria-label="Нарх" placeholder="Нарх">
-      <input class="money ${l.manual ? 'manual' : ''}" data-f="sum" data-i="${i}" inputmode="numeric" value="${l.sum === '' ? '' : fmt(l.sum)}" aria-label="Сумма" placeholder="Сумма" title="Қўлда ўзгартирилса — чегирма">` : ''}
+      ${sale ? `<input class="money ${isAdmin() ? '' : 'locked'}" data-f="price" data-i="${i}" inputmode="numeric" value="${l.price === '' ? '' : fmt(l.price)}" aria-label="Нарх" placeholder="Нарх" ${isAdmin() ? '' : 'readonly tabindex="-1" title="Нархни фақат админ ўзгартиради. Арзонроқ сотиш учун «Чегирма»ни ёқинг"'}>
+      <input class="money calc" data-f="sum" data-i="${i}" value="${l.sum === '' ? '' : fmt(l.sum)}" aria-label="Сумма" placeholder="Сумма" readonly tabindex="-1">` : ''}
       <button class="icon-btn x" data-act="del-line" data-i="${i}" title="Қаторни ўчириш" aria-label="Қаторни ўчириш">${ic('x')}</button>
     </div>`).join('');
   return `<div class="lines" id="lines">${head}${rows}<datalist id="dl-products">${prodOptions()}</datalist></div>
@@ -465,7 +490,11 @@ function updateTotals(kind) {
   const kinds = new Set(act.map((l) => l.product)).size;
   if (kind === 'sale') {
     const sum = act.reduce((a, l) => a + num(l.sum), 0);
-    el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона, ${kinds} хил маҳсулот</span>`;
+    const disc = f.disc ? num(f.discSum) : 0;
+    const debt = payKind(f.pay) === 'debt';
+    const cap = $('#co-cap'); if (cap) cap.textContent = debt ? 'Қарзга ёзилади' : 'Мижоз тўлайди';
+    const co = $('.checkout'); if (co) co.classList.toggle('debt', debt);
+    el.innerHTML = `<b class="amt">${fmt(Math.max(0, sum - disc))}<small>${cur()}</small></b><span class="sub">${disc ? `${fmt(sum)} − чегирма ${fmt(disc)} · ` : ''}${fmt(qty)} дона, ${kinds} хил${f.pay ? ' · ' + esc(f.pay) : ''}</span>`;
   } else {
     el.innerHTML = `<b class="amt">${fmt(qty)}<small>дона</small></b><span class="sub">${kinds} хил маҳсулот</span>`;
   }
@@ -474,7 +503,7 @@ function updateTotals(kind) {
 function checkoutHTML(kind, label) {
   const f = form(kind);
   return `<div class="checkout">
-    <div class="co-l"><span class="co-cap">Жами</span><div id="f-total"></div></div>
+    <div class="co-l"><span class="co-cap" id="co-cap">Жами</span><div id="f-total"></div></div>
     <button class="go" data-act="submit" data-kind="${kind}" ${f.busy ? 'disabled' : ''}>${f.busy ? '<span class="spin"></span>Сақланмоқда' : ic('check') + label}</button>
   </div>`;
 }
@@ -496,10 +525,30 @@ function viewSale() {
         </label>
       </div>
       ${linesHTML('sale')}
+      ${payBlockHTML(f)}
       <label class="field note"><span>Изоҳ</span><input data-ff="note" value="${esc(f.note)}" placeholder="Ихтиёрий"></label>
       ${checkoutHTML('sale', 'Сотиш')}
     </section>
     <aside class="feed" id="side">${sideHTML('sale')}</aside>
+  </div>`;
+}
+
+function payBlockHTML(f) {
+  const debt = payKind(f.pay) === 'debt';
+  return `<div class="payblock">
+    <div class="pb-row">
+      <span class="pb-cap">Тўлов тури</span>
+      <div class="chips" role="radiogroup" aria-label="Тўлов тури">${payTypes().map((p) => `<button type="button" class="chip k-${p.kind} ${f.pay === p.name ? 'on' : ''}" data-act="pay" data-v="${esc(p.name)}" role="radio" aria-checked="${f.pay === p.name}">${ic(payIcon(p.kind))}${esc(p.name)}</button>`).join('')}</div>
+    </div>
+    <div class="subbox debt-box ${debt ? '' : 'hidden'}" id="debt-box">
+      <label class="field grow"><span>Қарз изоҳи <b class="req" title="Мажбурий">*</b></span><input data-ff="debtNote" value="${esc(f.debtNote)}" placeholder="Телефони, қачон тўлашини айтди ва ҳ.к." autocomplete="off"></label>
+      <label class="field"><span>Тўлаш санаси</span><input type="date" data-ff="due" value="${esc(f.due)}" min="${todayISO()}" aria-label="Тўлаш санаси (ихтиёрий)"></label>
+    </div>
+    <button type="button" class="switch ${f.disc ? 'on' : ''}" data-act="disc" role="switch" aria-checked="${f.disc}"><i></i>${ic('tag')}Чегирма</button>
+    <div class="subbox disc-box ${f.disc ? '' : 'hidden'}" id="disc-box">
+      <label class="field"><span>Чегирма суммаси <b class="req">*</b></span><input class="money" data-ff="discSum" inputmode="numeric" value="${f.discSum ? fmt(f.discSum) : ''}" placeholder="0" autocomplete="off"></label>
+      <label class="field grow"><span>Чегирма сабаби <b class="req">*</b></span><input data-ff="discNote" value="${esc(f.discNote)}" placeholder="Масалан: доимий мижоз, врач тавсияси" autocomplete="off"></label>
+    </div>
   </div>`;
 }
 
@@ -618,6 +667,7 @@ function acPick(i) {
 
 function onViewKey(e) {
   if (e.target.id === 'ret-q' && e.key === 'Enter') { e.preventDefault(); retFind(); return; }
+  if (e.target.id === 'd-q' && e.key === 'Enter') { e.preventDefault(); loadDebts(); return; }
   if (e.target.id !== 'f-client' || !AC.items.length) return;
   if (e.key === 'ArrowDown') { e.preventDefault(); acMove(1); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); acMove(-1); }
@@ -633,7 +683,8 @@ function groupDocs(rows) {
     let g = m.get(r.doc);
     if (!g) {
       g = { doc: r.doc, date: r.date, time: r.time, type: r.type, branch: r.branch, to: r.to, client: r.client,
-        doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', lines: [], sum: 0, qty: 0 };
+        doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', pay: r.pay || '',
+        disc: Number(r.disc) || 0, discNote: r.discNote || '', lines: [], sum: 0, qty: 0 };
       m.set(r.doc, g);
     }
     g.lines.push(r);
@@ -654,7 +705,8 @@ function docCard(g) {
   const money_ = g.type === T.OUT || g.type === T.RET;
   const lines = g.lines.map((l) => `<li><span class="nm">${esc(l.product)}</span><span class="q">${fmt(l.qty)} × ${money_ && l.sum != null ? fmt(l.sum) : 'дона'}</span></li>`).join('');
   let who = '';
-  if (g.type === T.OUT) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span>${g.doctor ? `<span>${ic('doctor')}${esc(g.doctor)}</span>` : ''}</div>`;
+  if (g.type === T.OUT) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span>${g.doctor ? `<span>${ic('doctor')}${esc(g.doctor)}</span>` : ''}</div>`
+    + (g.disc ? `<div class="doc-who disc"><span>${ic('tag')}Чегирма −${fmt(g.disc)}${g.discNote ? ': ' + esc(g.discNote) : ''}</span></div>` : '');
   if (g.type === T.RET) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span><span>${ic('undo')}${esc(g.ref)} дан</span></div>${g.note ? `<div class="doc-who muted"><span>${ic('note')}${esc(g.note)}</span></div>` : ''}`;
   if (g.type === T.TR) who = `<div class="doc-who"><span class="route-s">${esc(g.branch)} ${ic('arrow')} ${esc(g.to)}</span></div>`;
   if (g.type === T.IN && g.note) who = `<div class="doc-who"><span>${ic('note')}${esc(g.note)}</span></div>`;
@@ -665,7 +717,7 @@ function docCard(g) {
       ${canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(g.doc)}" title="Ҳужжатни бекор қилиш">Бекор қилиш</button>` : ''}</header>
     ${who}
     <ul>${lines}</ul>
-    <footer><b class="${g.type === T.RET ? 'neg' : ''}">${g.type === T.OUT ? money(g.sum) : g.type === T.RET ? '−' + money(g.sum) : fmt(g.qty) + ' дона'}</b><span>${esc(g.op)}</span></footer>
+    <footer><b class="${g.type === T.RET ? 'neg' : ''}">${g.type === T.OUT ? money(g.sum - g.disc) : g.type === T.RET ? '−' + money(g.sum) : fmt(g.qty) + ' дона'}</b>${g.type === T.OUT || g.type === T.RET ? payTag(g.pay) : ''}<span>${esc(g.op)}</span></footer>
   </article>`;
 }
 
@@ -679,9 +731,10 @@ function sideHTML(kind) {
   if (kind === 'sale') {
     const rets = groupDocs(S.today.filter((r) => r.type === T.RET && r.status !== CANCEL && (!S.branch || r.branch === S.branch)));
     const retSum = rets.reduce((a, d) => a + d.sum, 0);
-    const gross = act.reduce((a, d) => a + d.sum, 0);
+    const gross = act.reduce((a, d) => a + d.sum - d.disc, 0);
+    const debtSum = act.filter((d) => payKind(d.pay) === 'debt').reduce((a, d) => a + d.sum - d.disc, 0);
     stats = `<div class="feed-stats">
-      <div class="fs-main"><small>Тушум${retSum ? ' (соф)' : ''}</small><b>${fmt(gross - retSum)}</b><small>${cur()}</small>${retSum ? `<em>қайтариш −${fmt(retSum)}</em>` : ''}</div>
+      <div class="fs-main"><small>Тушум${retSum ? ' (соф)' : ''}</small><b>${fmt(gross - retSum)}</b><small>${cur()}</small>${retSum ? `<em>қайтариш −${fmt(retSum)}</em>` : ''}${debtSum ? `<em class="dbt">шундан қарзга ${fmt(debtSum)}</em>` : ''}</div>
       <div><small>Чеклар</small><b>${act.length}</b></div>
       <div><small>Дона</small><b>${fmt(act.reduce((a, d) => a + d.qty, 0))}</b></div>
     </div>`;
@@ -705,6 +758,7 @@ function onViewInput(e) {
   if (!isForm(kind)) {
     if (t.id === 'stock-q') { S.stockQ = t.value; filterStock(); }
     if (t.id === 'h-q') S.hist.q = t.value;
+    if (t.id === 'd-q') S.debts.q = t.value;
     if (t.id === 'set-q') { S.set.q = t.value; filterSettings(); }
     if (S.page === 'return') retInput(t);
     if (t.id === 'r-branch' || t.id === 'r-doctor') {
@@ -715,7 +769,8 @@ function onViewInput(e) {
   }
   const f = form(kind);
   if (t.dataset.ff) {
-    f[t.dataset.ff] = t.value;
+    f[t.dataset.ff] = t.dataset.ff === 'discSum' ? num(t.value) : t.value;
+    if (t.dataset.ff === 'discSum') { updateTotals(kind); return; }
     if (t.id === 'f-client') acQuery(t.value);
     if (t.dataset.ff === 'to') { const h = $('#to-hint'); if (h) h.innerHTML = toHint(); }
     return;
@@ -753,10 +808,6 @@ function onViewInput(e) {
       if (s) s.value = fmt(l.sum);
     }
     f.lines.forEach((_, j) => updateLineMeta(kind, j));
-  } else if (fld === 'sum') {
-    l.sum = num(t.value);
-    l.manual = true;
-    t.classList.add('manual');
   }
   updateTotals(kind);
 }
@@ -769,7 +820,7 @@ function onViewBlur(e) {
     if (l && l.product) t.value = l.product;
     else if (t.value.trim()) t.classList.add('bad');
   }
-  if (t.dataset && (t.dataset.f === 'price' || t.dataset.f === 'sum') && t.value !== '') t.value = fmt(num(t.value));
+  if (t.dataset && (t.dataset.f === 'price' || t.dataset.f === 'sum' || t.dataset.ff === 'discSum') && t.value !== '') t.value = fmt(num(t.value));
 }
 
 async function onViewClick(e) {
@@ -795,6 +846,21 @@ async function onViewClick(e) {
     const inp = b.parentElement.querySelector('[data-f="qty"]');
     inp.value = Math.max(1, num(inp.value) + (act === 'qty-inc' ? 1 : -1));
     inp.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (act === 'pay') {
+    const f = form('sale');
+    f.pay = b.dataset.v;
+    document.querySelectorAll('[data-act="pay"]').forEach((x) => { const on = x.dataset.v === f.pay; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+    const debt = payKind(f.pay) === 'debt';
+    const box = $('#debt-box'); if (box) box.classList.toggle('hidden', !debt);
+    if (debt) { const i = box.querySelector('input'); if (i) i.focus(); }
+    updateTotals('sale');
+  } else if (act === 'disc') {
+    const f = form('sale');
+    f.disc = !f.disc;
+    b.classList.toggle('on', f.disc); b.setAttribute('aria-checked', f.disc);
+    const box = $('#disc-box'); if (box) box.classList.toggle('hidden', !f.disc);
+    if (f.disc) box.querySelector('input').focus();
+    updateTotals('sale');
   } else if (act === 'submit') {
     submit(b.dataset.kind);
   } else if (act === 'cancel') {
@@ -831,6 +897,22 @@ async function onViewClick(e) {
     retFrom(b.dataset.doc);
   } else if (act === 'xls') {
     exportExcel(b);
+  } else if (act === 'd-status') {
+    S.debts.status = b.dataset.v; S.debts.data = null; S.debts.error = ''; renderView();
+  } else if (act === 'd-load') {
+    loadDebts();
+  } else if (act === 'd-pay') {
+    debtPay(b.dataset.id);
+  } else if (act === 'd-edit') {
+    debtEdit(b.dataset.id);
+  } else if (act === 'f-preset') {
+    S.fin.preset = b.dataset.p; S.fin.data = null; S.fin.error = ''; renderView();
+  } else if (act === 'f-load') {
+    loadFinance();
+  } else if (act === 'fin-new') {
+    finNew(b.dataset.grp);
+  } else if (act === 'fin-cancel') {
+    finCancel(b.dataset.no);
   } else if (act === 'set-tab') {
     S.set.tab = b.dataset.tab; S.set.q = ''; renderView();
   } else if (act === 'set-new') {
@@ -876,7 +958,19 @@ async function submit(kind) {
     const free = lines.find((l) => !(num(l.sum) > 0));
     if (free) return toast(`«${free.product}»: нарх ёки суммани ёзинг`, 'err');
     payload.client = f.client; payload.doctor = f.doctor;
-    payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty), price: num(l.price), sum: num(l.sum) }));
+    payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty), price: num(l.price) }));
+    const total = lines.reduce((a, l) => a + num(l.sum), 0);
+    if (!f.pay) return toast('Тўлов турини танланг', 'err');
+    payload.pay = f.pay;
+    if (f.disc && num(f.discSum) > 0) {
+      if (num(f.discSum) > total) return toast(`Чегирма сотув суммасидан (${fmt(total)}) катта бўлмасин`, 'err');
+      if (!f.discNote.trim()) { toast('Чегирма сабабини ёзинг', 'err'); const i = $('[data-ff="discNote"]'); if (i) i.focus(); return; }
+      payload.discount = String(num(f.discSum)); payload.discountNote = f.discNote;
+    }
+    if (payKind(f.pay) === 'debt') {
+      if (!f.debtNote.trim()) { toast('Қарз учун изоҳ ёзинг: телефони, қачон тўлайди', 'err'); const i = $('[data-ff="debtNote"]'); if (i) i.focus(); return; }
+      payload.debtNote = f.debtNote; payload.due = f.due;
+    }
   } else {
     payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty) }));
   }
@@ -902,7 +996,9 @@ async function submit(kind) {
     const j = await api(kind, payload);
     applyState(j);
     S.forms[kind] = null;
-    const label = { sale: 'Сотилди', income: 'Приход қилинди', transfer: 'Ўтказилди' }[kind];
+    const label = kind === 'sale' && j.debt ? 'Қарзга сотилди' : { sale: 'Сотилди', income: 'Приход қилинди', transfer: 'Ўтказилди' }[kind];
+    if (j.debt) S.debts.data = null;
+    S.fin.data = null;
     toast(`${label}: ${j.doc}${kind === 'sale' && j.total != null ? ', ' + money(j.total) : ''}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
     S.hist.data = null; S.rep.data = null;
     if (kind === 'sale') AC.cache.clear();
@@ -934,7 +1030,7 @@ async function cancelDoc(doc) {
     const j = await api('cancel', { doc, reason, rid: uid() });
     applyState(j);
     toast(`${doc} бекор қилинди`, 'ok');
-    S.rep.data = null;
+    S.rep.data = null; S.fin.data = null; S.debts.data = null;
     if (S.page === 'history') { S.hist.data = null; loadHistory(); } else renderView();
   } catch (err) { toast(err.message, 'err'); }
 }
@@ -968,7 +1064,7 @@ function renderRet() {
 }
 
 function retRemain(l) { return Math.max(0, l.qty - (l.returned || 0)); }
-function retDefSum(l, q) { return l.qty ? Math.round(((l.sum || 0) * q) / l.qty) : 0; }
+function retDefSum(l, q) { return l.qty ? Math.round(((l.sum || 0) * (l.fac == null ? 1 : l.fac) * q) / l.qty) : 0; }
 
 function retBody() {
   const r = retState();
@@ -987,7 +1083,7 @@ function retBody() {
         ${left ? `<button class="btn primary sm" data-act="ret-pick" data-doc="${esc(d.doc)}">${ic('undo')}Қайтариш</button>` : '<span class="tag gray">Тўлиқ қайтарилган</span>'}</header>
       <div class="doc-who"><span>${ic('user')}${esc(d.client)}</span>${d.doctor ? `<span>${ic('doctor')}${esc(d.doctor)}</span>` : ''}</div>
       <ul>${d.lines.map((l) => `<li><span class="nm">${esc(l.product)}</span><span class="q">${fmt(l.qty)} × ${fmt(l.sum)}${l.returned ? ` · <em>қайтарилган ${l.returned}</em>` : ''}</span></li>`).join('')}</ul>
-      <footer><b>${money(sum)}</b><span>${esc(d.op)}</span></footer>
+      <footer><b>${money(sum - (Number(d.discount) || 0))}</b>${payTag(d.pay)}<span>${esc(d.op)}</span></footer>
     </article>`;
   }).join('')}</div>`;
 }
@@ -1038,7 +1134,8 @@ function retTotals() {
     qty += q;
     sum += r.manual[l.id] ? (r.sums[l.id] || 0) : retDefSum(l, q);
   });
-  el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона «${esc(r.sel.branch)}» қолдиғига қайтади</span>`;
+  const debt = payKind(r.sel.pay) === 'debt';
+  el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона «${esc(r.sel.branch)}» қолдиғига қайтади${debt ? ' · аввал қарздан айрилади' : ''}${Number(r.sel.discount) ? ' · чегирма ҳисобга олинган' : ''}</span>`;
 }
 
 function retInput(t) {
@@ -1093,6 +1190,9 @@ function retPick(doc) {
   const d = (r.results || []).find((x) => x.doc === doc);
   if (!d) return;
   r.sel = d; r.qty = {}; r.sums = {}; r.manual = {}; r.rid = uid();
+  const tot = d.lines.reduce((a, l) => a + (l.sum || 0), 0);
+  const fac = tot > 0 ? (tot - (Number(d.discount) || 0)) / tot : 1;
+  d.lines.forEach((l) => { l.fac = fac; });
   const open = d.lines.filter((l) => retRemain(l) > 0);
   if (open.length === 1) r.qty[open[0].id] = Math.min(1, retRemain(open[0]));
   renderRet();
@@ -1118,21 +1218,277 @@ async function retSubmit() {
   const total = items.reduce((a, x) => a + x.sum, 0);
   if (!(await modal({
     title: 'Қайтаришни тасдиқланг',
-    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади. Мижозга <b>${money(total)}</b> қайтарасиз. Маҳсулот <b>${esc(r.sel.branch)}</b> қолдиғига қўшилади.`,
+    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади${payKind(r.sel.pay) === 'debt' ? `. Сумма <b>${money(total)}</b> — аввал мижознинг қарзидан айрилади, қарздан ортгани пул қилиб қайтарилади` : `. Мижозга <b>${money(total)}</b> қайтарасиз`}. Маҳсулот <b>${esc(r.sel.branch)}</b> қолдиғига қўшилади.`,
     ok: 'Қайтариш',
   }))) return;
   r.busy = true; renderRet();
   try {
     const j = await api('return', { branch: r.sel.branch, ref: r.sel.doc, reason: r.reason, items, rid: r.rid });
     applyState(j);
-    toast(`Қайтарилди: ${j.doc}, ${money(j.total)}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
-    S.ret = null; S.hist.data = null; S.rep.data = null;
+    const parts = [];
+    if (j.debtCut) parts.push(`қарздан −${fmt(j.debtCut)}`);
+    if (j.refund) parts.push(`мижозга ${fmt(j.refund)} (${j.refundPay})`);
+    toast(`Қайтарилди: ${j.doc}, ${money(j.total)}${parts.length ? ' · ' + parts.join(', ') : ''}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
+    S.ret = null; S.hist.data = null; S.rep.data = null; S.fin.data = null; S.debts.data = null;
     renderView();
     const q = $('#ret-q'); if (q) q.focus();
   } catch (e) {
     r.busy = false; renderRet();
     toast(e.message, 'err');
   }
+}
+
+/* ───────────── qarzdorlar ───────────── */
+
+function daysTo(iso) {
+  const a = new Date(todayISO() + 'T00:00:00Z'); const b = new Date(iso + 'T00:00:00Z');
+  return Math.round((b - a) / 86400000);
+}
+function dueInfo(x) {
+  if (x.left <= 0) return { cls: 'done', label: 'Ёпилган' };
+  if (!x.due) return { cls: 'none', label: 'Сана белгиланмаган' };
+  const n = daysTo(x.due);
+  if (n < 0) return { cls: 'late', label: `${-n} кун ўтди · ${dLabel(x.due)}` };
+  if (n === 0) return { cls: 'soon', label: 'Бугун тўлаши керак' };
+  if (n <= 3) return { cls: 'soon', label: `${n} кун қолди · ${dLabel(x.due)}` };
+  return { cls: 'ok', label: `${dLabel(x.due)} гача` };
+}
+
+function viewDebts() {
+  const d = S.debts;
+  let body = loadingHTML;
+  if (d.error) body = `<p class="empty err">${esc(d.error)}</p>`;
+  else if (d.data && !d.loading) body = debtsBody(d.data);
+  const segs = [['open', 'Очиқ'], ['closed', 'Ёпилган'], ['all', 'Ҳаммаси']];
+  return `<section class="panel">
+    <div class="filters">
+      <div class="f-row">
+        <div class="seg" role="group" aria-label="Ҳолати">${segs.map(([k, t]) => `<button class="${d.status === k ? 'on' : ''}" data-act="d-status" data-v="${k}">${t}</button>`).join('')}</div>
+        <div class="search grow">${ic('search')}<input id="d-q" placeholder="Мижоз исми, чек рақами ёки изоҳ" value="${esc(d.q)}" aria-label="Қарздорни қидириш"></div>
+        <button class="btn primary" data-act="d-load">Қидириш</button>
+      </div>
+    </div>
+    <p class="range-cap">${S.branch ? esc(S.branch) : (isAdmin() ? 'Ҳамма филиаллар' : esc(S.user.branch))}</p>
+    <div id="d-body">${body}</div>
+  </section>`;
+}
+
+async function loadDebts() {
+  const d = S.debts;
+  const q = $('#d-q'); if (q) d.q = q.value;
+  d.loading = true; d.error = '';
+  const b = $('#d-body'); if (b) b.innerHTML = loadingHTML;
+  try { d.data = await api('debts', { status: d.status, q: d.q, branch: S.branch }); } catch (e) { d.error = e.message; d.data = null; }
+  d.loading = false;
+  if (S.page === 'debts') { const bb = $('#d-body'); if (bb) bb.innerHTML = d.error ? `<p class="empty err">${esc(d.error)}</p>` : debtsBody(d.data); }
+}
+
+function debtsBody(d) {
+  const t = d.tot;
+  const stats = `<div class="stats">
+    <div class="st-main"><small>Очиқ қарз</small><b>${money(t.left)}</b><span>${fmt(t.count)} та қарздор</span></div>
+    <div class="${t.overdue ? 'st-late' : ''}"><small>Муддати ўтган</small><b>${fmt(t.overdueSum)}</b><span>${fmt(t.overdue)} та</span></div>
+    <div class="${t.soon ? 'st-soon' : ''}"><small>3 кун ичида</small><b>${fmt(t.soonSum)}</b><span>${fmt(t.soon)} та</span></div>
+    <div><small>Ёпилган</small><b>${fmt(t.closed)}</b><span>та қарз</span></div>
+  </div>`;
+  if (!d.rows.length) {
+    const msg = S.debts.status === 'open' ? 'Очиқ қарз йўқ. Қарзга сотиш учун сотувда «Қарз» тўлов турини танланг.' : 'Бундай ёзув топилмади.';
+    return stats + `<p class="empty">${msg}</p>`;
+  }
+  return stats + `<div class="debt-grid">${d.rows.map(debtCard).join('')}</div>`;
+}
+
+function debtCard(x) {
+  const di = dueInfo(x);
+  const done = x.paid + x.cut;
+  const pct = x.amount ? Math.min(100, Math.round((done / x.amount) * 100)) : 0;
+  const mine = isAdmin() || x.branch === S.user.branch;
+  const hist = x.pays.map((p) => `<li><span>${dLabel(p.date)} ${esc(p.time)}</span><span>${payTag(p.pay)}</span><b>+${fmt(p.amount)}</b><span class="muted">${esc(p.op)}</span></li>`)
+    .concat(x.rets.map((r) => `<li><span>${dLabel(r.date)}</span><span class="muted">${esc(r.doc)} қайтариш</span><b>−${fmt(r.cut)}</b><span></span></li>`)).join('');
+  return `<article class="debt-c ${di.cls}">
+    <header><b class="cl">${esc(x.client)}</b><span class="due ${di.cls}">${ic('cal')}${di.label}</span></header>
+    <div class="meta">${esc(x.doc)} · ${dLabel(x.date)}${!S.branch && isAdmin() ? ' · ' + esc(x.branch) : ''}${x.doctor ? ' · ' + esc(x.doctor) : ''}</div>
+    ${x.note ? `<p class="dnote">${ic('note')}<span>${esc(x.note)}</span></p>` : ''}
+    <div class="prog" aria-hidden="true"><i style="width:${pct}%"></i></div>
+    <div class="nums"><span><small>Қарз</small>${fmt(x.amount)}</span><span><small>Тўланди</small>${fmt(done)}</span><span class="lft"><small>Қолди</small>${fmt(x.left)}</span></div>
+    ${hist ? `<details class="dh"><summary>Тўловлар тарихи (${x.pays.length + x.rets.length})</summary><ul>${hist}</ul></details>` : ''}
+    ${mine ? `<footer>${x.left > 0 ? `<button class="btn primary sm" data-act="d-pay" data-id="${x.id}">${ic('cash')}Тўлов қабул қилиш</button>` : ''}
+      <button class="btn soft sm" data-act="d-edit" data-id="${x.id}">${ic('pencil')}Сана ва изоҳ</button></footer>` : ''}
+  </article>`;
+}
+
+function debtById(id) { return ((S.debts.data && S.debts.data.rows) || []).find((x) => String(x.id) === String(id)); }
+
+function debtPay(id) {
+  const x = debtById(id);
+  if (!x) return;
+  const rid = uid();
+  formModal({
+    title: `${x.client}: тўлов қабул қилиш`,
+    fields: [
+      { key: 'amount', label: `Сумма (қолган қарз ${fmt(x.left)})`, type: 'money', value: fmt(x.left) },
+      { key: 'pay', label: 'Қандай тўлади', type: 'select', value: (moneyPays()[0] || {}).name, options: moneyPays().map((p) => [p.name, p.name]) },
+      { key: 'note', label: 'Изоҳ', value: '', full: true, placeholder: 'Ихтиёрий' },
+    ],
+    ok: 'Қабул қилиш',
+    onSubmit: async (v) => {
+      if (!(Number(v.amount) > 0)) throw new Error('Тўлов суммасини ёзинг');
+      if (Number(v.amount) > x.left) throw new Error(`Қолган қарз ${fmt(x.left)} — ундан кўп ёзиб бўлмайди`);
+      const j = await api('debtPay', { id: x.id, amount: v.amount, pay: v.pay, note: v.note, rid });
+      toast(j.left > 0 ? `Қабул қилинди: ${j.no}. Қолди ${money(j.left)}` : `Қабул қилинди: ${j.no}. Қарз тўлиқ ёпилди`, 'ok');
+      S.fin.data = null; S.rep.data = null;
+      loadDebts();
+    },
+  });
+}
+
+function debtEdit(id) {
+  const x = debtById(id);
+  if (!x) return;
+  formModal({
+    title: `${x.client}: сана ва изоҳ`,
+    fields: [
+      { key: 'due', label: 'Тўлаш санаси (бўш қолдириш мумкин)', type: 'date', value: x.due, full: true },
+      { key: 'note', label: 'Изоҳ', value: x.note, full: true },
+    ],
+    onSubmit: async (v) => {
+      await api('debtEdit', { id: x.id, due: v.due, note: v.note });
+      toast('Сақланди', 'ok');
+      loadDebts();
+    },
+  });
+}
+
+/* ───────────── moliya ───────────── */
+
+const FIN_CAT = { 'Сотув': 'Сотувдан', 'Қарз тўлови': 'Қарз тўлови', 'Қайтариш': 'Мижозга қайтарилди', 'Харажат': 'Аптека харажати', 'Кассадан ечиш': 'Кассадан ечилди' };
+
+function viewFinance() {
+  const f = S.fin;
+  const [from, to] = presetRange(f.preset, f.from, f.to);
+  let body = loadingHTML;
+  if (f.error) body = `<p class="empty err">${esc(f.error)}</p>`;
+  else if (f.data && !f.loading) body = finBody(f.data);
+  return `<section class="panel">
+    <div class="filters">
+      <div class="f-row">${periodBar('f', f)}${f.preset === 'custom' ? '<button class="btn primary sm" data-act="f-load">Кўрсатиш</button>' : ''}</div>
+      <div class="f-row">
+        <button class="btn primary" data-act="fin-new" data-grp="exp">${ic('minus')}Харажат ёзиш</button>
+        <button class="btn soft" data-act="fin-new" data-grp="cash">${ic('wallet')}Кассадан пул ечиш</button>
+      </div>
+    </div>
+    <p class="range-cap">${S.branch ? esc(S.branch) : (isAdmin() ? 'Ҳамма филиаллар' : esc(S.user.branch))}, ${rangeLabel(from, to)}</p>
+    <div id="f-body">${body}</div>
+  </section>`;
+}
+
+async function loadFinance() {
+  const f = S.fin;
+  if ($('#f-from')) f.from = $('#f-from').value;
+  if ($('#f-to')) f.to = $('#f-to').value;
+  const [from, to] = presetRange(f.preset, f.from, f.to);
+  f.loading = true; f.error = '';
+  const b = $('#f-body'); if (b) b.innerHTML = loadingHTML;
+  try { f.data = await api('finance', { from, to, branch: S.branch }); } catch (e) { f.error = e.message; f.data = null; }
+  f.loading = false;
+  if (S.page === 'finance') { const bb = $('#f-body'); if (bb) bb.innerHTML = f.error ? `<p class="empty err">${esc(f.error)}</p>` : finBody(f.data); }
+}
+
+function finCanCancel(r) {
+  if (r.status === CANCEL || r.cat === 'Сотув' || r.cat === 'Қайтариш') return false;
+  if (isAdmin()) return true;
+  return r.branch === S.user.branch && r.date === todayISO();
+}
+
+function finBody(d) {
+  const t = d.tot;
+  const diff = t.in - t.out;
+  const ins = d.cats.filter((c) => c.dir === 'in');
+  const outs = d.cats.filter((c) => c.dir === 'out');
+  const catRow = (c) => `<tr><td>${esc(FIN_CAT[c.cat] || c.cat)}${c.sub ? ` <span class="muted">· ${esc(c.sub)}</span>` : ''}</td><td class="num">${fmt(c.n)}</td><td class="num b ${c.dir === 'out' ? 'neg' : 'pos'}">${c.dir === 'out' ? '−' : '+'}${fmt(c.sum)}</td></tr>`;
+  return `<div class="stats rep6 fin">
+    <div class="st-main"><small>Кассадаги нақд пул</small><b>${money(t.cash)}</b><span>ҳозир, ҳамма вақт бўйича</span></div>
+    <div><small>Кирим</small><b class="pos">+${fmt(t.in)}</b><span>шу даврда</span></div>
+    <div><small>Чиқим</small><b class="neg">−${fmt(t.out)}</b><span>шу даврда</span></div>
+    <div><small>Фарқ</small><b class="${diff < 0 ? 'neg' : ''}">${diff < 0 ? '−' : ''}${fmt(Math.abs(diff))}</b><span>кирим − чиқим</span></div>
+    <div><small>Ҳамма кассалар</small><b>${fmt(t.bal)}</b><span>нақд + карта + ўтказма</span></div>
+    <div><small>Очиқ қарз</small><b>${fmt(t.debt)}</b><span>мижозларда</span></div>
+  </div>
+
+  ${d.branches.length ? `<h3 class="sec">Филиаллар</h3>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Филиал</th><th class="num">Кирим</th><th class="num">Чиқим</th><th class="num">Кассадаги нақд</th><th class="num">Ҳамма кассалар</th><th class="num">Очиқ қарз</th></tr></thead>
+    <tbody>${d.branches.map((b) => `<tr><td class="b">${esc(b.branch)}</td><td class="num pos">+${fmt(b.in)}</td><td class="num neg">−${fmt(b.out)}</td><td class="num b">${fmt(b.cash)}</td><td class="num">${fmt(b.bal)}</td><td class="num">${fmt(b.debt)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+
+  <div class="two">
+    <div>
+      <h3 class="sec">Тўлов турлари бўйича</h3>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Тур</th><th class="num">Кирим</th><th class="num">Чиқим</th><th class="num">Ҳозирги қолдиқ</th></tr></thead>
+        <tbody>${d.pays.map((p) => `<tr><td>${payTag(p.pay)}</td><td class="num">${fmt(p.in)}</td><td class="num">${fmt(p.out)}</td><td class="num b">${fmt(p.bal)}</td></tr>`).join('')}</tbody></table></div>
+    </div>
+    <div>
+      <h3 class="sec">Нимадан кирди, нимага кетди</h3>
+      ${d.cats.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Тоифа</th><th class="num">Сони</th><th class="num">Сумма</th></tr></thead>
+        <tbody>${ins.map(catRow).join('')}${outs.map(catRow).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда ёзув йўқ</p>'}
+    </div>
+  </div>
+
+  <h3 class="sec">Ҳамма ёзувлар</h3>
+  ${d.total > d.rows.length ? `<p class="hint soft">${ic('alert')}<span>Охирги ${d.rows.length} та ёзув кўрсатилди, жами ${d.total} та.</span></p>` : ''}
+  ${d.rows.length ? `<div class="tbl-wrap"><table class="tbl hist fin-t"><thead><tr><th>Сана</th><th>№</th>${!S.branch && isAdmin() ? '<th>Филиал</th>' : ''}<th>Тоифа</th><th>Тўлов</th><th class="num">Сумма</th><th>Изоҳ</th><th>Оператор</th><th></th></tr></thead>
+    <tbody>${d.rows.map((r) => `<tr class="${r.status === CANCEL ? 'off' : ''}">
+      <td class="nw">${dLabel(r.date)} <span class="muted">${esc(r.time)}</span></td><td class="nw b">${esc(r.no)}</td>
+      ${!S.branch && isAdmin() ? `<td class="nw">${esc(r.branch)}</td>` : ''}
+      <td><span class="tag ${r.dir === 'in' ? 'leaf' : 'red'}">${r.dir === 'in' ? 'Кирим' : 'Чиқим'}</span> ${esc(FIN_CAT[r.cat] || r.cat)}${r.sub ? ` <span class="muted">· ${esc(r.sub)}</span>` : ''}</td>
+      <td class="nw">${payTag(r.pay)}</td>
+      <td class="num b ${r.dir === 'out' ? 'neg' : 'pos'}">${r.dir === 'out' ? '−' : '+'}${fmt(r.amount)}</td>
+      <td class="note">${esc(r.note)}${r.cancel ? `${r.note ? ' · ' : ''}<span class="neg">${esc(r.cancel)}</span>` : ''}</td>
+      <td class="nw muted">${esc(r.op)}</td>
+      <td class="acts">${finCanCancel(r) ? `<button class="mini-danger" data-act="fin-cancel" data-no="${esc(r.no)}">Бекор қилиш</button>` : ''}</td>
+    </tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда молия ёзуви йўқ. Сотув, қарз тўлови ва харажатлар шу ерга тушади.</p>'}`;
+}
+
+function finNew(grp) {
+  const cats = ((S.cfg.finCats || {})[grp]) || [];
+  if (!cats.length) return toast('Созламаларда тоифа қўшинг', 'err');
+  const needBr = isAdmin() && !S.branch;
+  const rid = uid();
+  const fields = [];
+  if (needBr) fields.push({ key: 'branch', label: 'Филиал', type: 'select', value: '', options: [['', 'Филиални танланг']].concat(branchNames().map((b) => [b, b])), full: true });
+  fields.push(
+    { key: 'sub', label: grp === 'exp' ? 'Харажат тури' : 'Нимага ечилди', type: 'select', value: cats[0], options: cats.map((c) => [c, c]) },
+    { key: 'amount', label: `Сумма, ${cur()}`, type: 'money', value: '' },
+    { key: 'pay', label: 'Қайси кассадан', type: 'select', value: (moneyPays()[0] || {}).name, options: moneyPays().map((p) => [p.name, p.name]) },
+    { key: 'note', label: 'Изоҳ', value: '', placeholder: 'Масалан: ноябрь ойи учун', full: true },
+  );
+  formModal({
+    title: grp === 'exp' ? `Аптека харажати${S.branch ? ' · ' + S.branch : ''}` : `Кассадан пул ечиш${S.branch ? ' · ' + S.branch : ''}`,
+    fields, ok: 'Ёзиш',
+    onSubmit: async (v) => {
+      const br = needBr ? v.branch : S.branch;
+      if (needBr && !br) throw new Error('Филиални танланг');
+      if (!(Number(v.amount) > 0)) throw new Error('Суммани ёзинг');
+      const j = await api('finAdd', { grp, sub: v.sub, amount: v.amount, pay: v.pay, note: v.note, branch: br, rid });
+      toast(`Ёзилди: ${j.no}, −${money(v.amount)}`, 'ok');
+      S.rep.data = null;
+      loadFinance();
+    },
+  });
+}
+
+async function finCancel(no) {
+  const reason = await modal({
+    title: `${no} ни бекор қилиш`,
+    body: 'Ёзув ўчмайди, «Бекор» деб белгиланади ва касса қолдиғи тузалади. Сабабини ёзинг.',
+    input: 'Сабаби', ok: 'Бекор қилиш', danger: true,
+  });
+  if (reason == null) return;
+  if (!reason.trim()) return toast('Бекор қилиш сабабини ёзинг', 'err');
+  try {
+    await api('finCancel', { no, reason });
+    toast(`${no} бекор қилинди`, 'ok');
+    S.debts.data = null;
+    loadFinance();
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 /* ───────────── qoldiq ───────────── */
@@ -1247,7 +1603,8 @@ function histTable(d) {
   const act = d.rows.filter((r) => r.status !== CANCEL);
   const sales = act.filter((r) => r.type === T.OUT);
   const sDocs = new Set(sales.map((r) => r.doc)).size;
-  const sum = sales.reduce((a, r) => a + (r.sum || 0), 0);
+  const discSum = groupDocs(sales).reduce((a, g) => a + g.disc, 0);
+  const sum = sales.reduce((a, r) => a + (r.sum || 0), 0) - discSum;
   const inQ = act.filter((r) => r.type === T.IN).reduce((a, r) => a + r.qty, 0);
   const trQ = act.filter((r) => r.type === T.TR).reduce((a, r) => a + r.qty, 0);
   const canc = new Set(d.rows.filter((r) => r.status === CANCEL).map((r) => r.doc)).size;
@@ -1270,12 +1627,12 @@ function histTable(d) {
         const g = docMap.get(r.doc);
         return `<tr class="${r.status === CANCEL ? 'off' : ''} ${first ? 'first' : ''}">
           <td class="nw">${first ? `${dLabel(r.date)} <span class="muted">${esc(r.time)}</span>` : ''}</td>
-          <td class="nw b">${first ? esc(r.doc) : ''}</td><td>${first ? typeTag(r.type) : ''}</td>
+          <td class="nw b">${first ? esc(r.doc) : ''}</td><td class="nw">${first ? typeTag(r.type) + (r.pay ? '<br>' + payTag(r.pay) : '') : ''}</td>
           <td class="nw">${first ? esc(r.branch) + (r.type === T.TR ? ` <span class="muted">→</span> ${esc(r.to)}` : '') : ''}</td>
           <td>${esc(r.product)}</td><td class="num">${fmt(r.qty)}</td>
           <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b ${r.type === T.RET ? 'neg' : ''}">${r.sum != null ? (r.type === T.RET ? '−' : '') + fmt(r.sum) : ''}</td>
           <td>${first ? esc(r.client) : ''}</td><td>${first ? esc(r.doctor) : ''}</td><td class="nw muted">${first ? esc(r.op) : ''}</td>
-          <td class="note">${first ? (r.ref ? `<b>Асос: ${esc(r.ref)}</b>${r.note ? ' · ' : ''}` : '') + esc(r.note) : ''}</td>
+          <td class="note">${first ? (r.ref ? `<b>Асос: ${esc(r.ref)}</b>${r.note ? ' · ' : ''}` : '') + (Number(r.disc) ? `<b class="discn">Чегирма −${fmt(r.disc)}${r.discNote ? ': ' + esc(r.discNote) : ''}</b>${r.note ? ' · ' : ''}` : '') + esc(r.note) : ''}</td>
           <td class="acts">${first && g && g.type === T.OUT && g.status !== CANCEL && (isAdmin() || g.branch === S.user.branch) ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -1337,28 +1694,28 @@ function repBody(d) {
   const mprods = Object.keys(d.matrix);
   return `
   <div class="stats rep6">
-    <div class="st-main"><small>Соф тушум</small><b>${money(t.sum)}</b><span>сотув ${fmt(t.gross)} − қайтариш ${fmt(t.retSum)}</span></div>
-    <div><small>Чеклар</small><b>${fmt(t.docs)}</b><span>ўртача ${t.docs ? fmt(t.gross / t.docs) : 0}</span></div>
-    <div><small>Сотилган (соф)</small><b>${fmt(t.qty)}</b><span>дона</span></div>
+    <div class="st-main"><small>Соф тушум</small><b>${money(t.sum)}</b><span>сотув ${fmt(t.gross)} − чегирма ${fmt(t.discount)} − қайтариш ${fmt(t.retSum)}</span></div>
+    <div><small>Чегирма</small><b class="${t.discount ? 'disc' : ''}">${t.discount ? '−' : ''}${fmt(t.discount)}</b><span>${fmt(t.discDocs)} та чекда</span></div>
     <div><small>Қайтариш</small><b class="${t.retSum ? 'neg' : ''}">${t.retSum ? '−' : ''}${fmt(t.retSum)}</b><span>${fmt(t.retDocs)} та, ${fmt(t.retQty)} дона</span></div>
-    <div><small>Мижозлар</small><b>${fmt(t.clients)}</b><span>киши</span></div>
+    <div><small>Чеклар</small><b>${fmt(t.docs)}</b><span>${fmt(t.clients)} мижоз, ${fmt(t.qty)} дона (соф)</span></div>
+    <div><small>Очиқ қарз</small><b>${fmt(d.debt.open)}</b><span>${fmt(d.debt.openCount)} та қарздор</span></div>
     <div><small>Приход · Ўтказма</small><b>${fmt(t.inQty)} · ${fmt(t.trQty)}</b><span>дона, бекор: ${t.cancelled}</span></div>
   </div>
 
   <h3 class="sec">Филиаллар</h3>
   <div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Филиал</th><th class="num">Соф тушум</th><th class="w"></th><th class="num">Сотув</th><th class="num">Қайтариш</th><th class="num">Чек</th><th class="num">Дона</th><th class="num">Приход</th><th class="num">Ўтказма кирди</th><th class="num">Ўтказма чиқди</th><th class="num">Ҳозирги қолдиқ</th></tr></thead>
+    <thead><tr><th>Филиал</th><th class="num">Соф тушум</th><th class="w"></th><th class="num">Сотув</th><th class="num">Чегирма</th><th class="num">Қайтариш</th><th class="num">Чек</th><th class="num">Дона</th><th class="num">Приход</th><th class="num">Ўтказма кирди</th><th class="num">Ўтказма чиқди</th><th class="num">Ҳозирги қолдиқ</th></tr></thead>
     <tbody>${brs.map((b) => {
-      const x = d.byBranch[b] || { sum: 0, gross: 0, retSum: 0, docs: 0, qty: 0, inQty: 0, trIn: 0, trOut: 0 };
+      const x = d.byBranch[b] || { sum: 0, gross: 0, disc: 0, retSum: 0, docs: 0, qty: 0, inQty: 0, trIn: 0, trOut: 0 };
       const st = (S.cfg.products || []).reduce((a, p) => a + stockOf(b, p.name), 0);
-      return `<tr><td class="b">${esc(b)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, bMax)}</td><td class="num">${fmt(x.gross)}</td><td class="num ${x.retSum ? 'neg' : 'muted'}">${x.retSum ? '−' + fmt(x.retSum) : 0}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num">${fmt(x.inQty)}</td><td class="num">${fmt(x.trIn)}</td><td class="num">${fmt(x.trOut)}</td><td class="num">${fmt(st)}</td></tr>`;
+      return `<tr><td class="b">${esc(b)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, bMax)}</td><td class="num">${fmt(x.gross)}</td><td class="num ${x.disc ? 'disc' : 'muted'}">${x.disc ? '−' + fmt(x.disc) : 0}</td><td class="num ${x.retSum ? 'neg' : 'muted'}">${x.retSum ? '−' + fmt(x.retSum) : 0}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num">${fmt(x.inQty)}</td><td class="num">${fmt(x.trIn)}</td><td class="num">${fmt(x.trOut)}</td><td class="num">${fmt(st)}</td></tr>`;
     }).join('')}</tbody>
   </table></div>
 
   <div class="two">
     <div>
       <h3 class="sec">Маҳсулотлар</h3>
-      ${prods.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th><th class="num">Дона (соф)</th><th class="num">Қайтарилган</th><th class="num">Сумма (соф)</th><th class="w"></th></tr></thead>
+      ${prods.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th><th class="num">Дона (соф)</th><th class="num">Қайтарилган</th><th class="num">Сумма (нархда)</th><th class="w"></th></tr></thead>
         <tbody>${prods.map(([n, x]) => `<tr><td>${esc(n)}</td><td class="num">${fmt(x.qty)}</td><td class="num ${x.ret ? 'neg' : 'muted'}">${fmt(x.ret || 0)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, pMax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда сотув йўқ</p>'}
     </div>
     <div>
@@ -1367,6 +1724,26 @@ function repBody(d) {
         <tbody>${docs.map(([n, x]) => `<tr><td>${esc(n)}</td><td class="num">${fmt(x.docs)}</td><td class="num">${fmt(x.qty)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, dMax)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда сотув йўқ</p>'}
     </div>
   </div>
+
+  <div class="two">
+    <div>
+      <h3 class="sec">Тўлов турлари (сотув, чегирмадан кейин)</h3>
+      ${d.byPay.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Тур</th><th class="num">Чек</th><th class="num">Сумма</th><th class="w"></th></tr></thead>
+        <tbody>${d.byPay.map((x) => `<tr><td>${payTag(x.pay)}</td><td class="num">${fmt(x.docs)}</td><td class="num b">${fmt(x.sum)}</td><td class="w">${bar(x.sum, Math.max(...d.byPay.map((y) => y.sum)))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда сотув йўқ</p>'}
+    </div>
+    <div>
+      <h3 class="sec">Қарзлар</h3>
+      <div class="tbl-wrap"><table class="tbl"><tbody>
+        <tr><td>Шу даврда қарзга сотилди</td><td class="num b">${fmt(d.debt.given)}</td></tr>
+        <tr><td>Шу даврда қарз тўланди</td><td class="num b pos">${fmt(d.debt.paid)}</td></tr>
+        <tr><td>Ҳозир очиқ қарз (${fmt(d.debt.openCount)} та)</td><td class="num b">${fmt(d.debt.open)}</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <h3 class="sec">Чегирмалар ${d.discounts.length ? `<span class="muted">· ${d.discounts.length} та, жами −${fmt(t.discount)}</span>` : ''}</h3>
+  ${d.discounts.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Сана</th><th>Чек</th><th>Филиал</th><th>Мижоз</th><th>Сотувчи</th><th class="num">Нархда</th><th class="num">Чегирма</th><th>Сабаби</th></tr></thead>
+    <tbody>${d.discounts.map((x) => `<tr><td class="nw">${dLabel(x.date)} <span class="muted">${esc(x.time)}</span></td><td class="nw b">${esc(x.doc)}</td><td class="nw">${esc(x.branch)}</td><td>${esc(x.client)}</td><td class="nw muted">${esc(x.op)}</td><td class="num">${fmt(x.gross)}</td><td class="num b disc">−${fmt(x.disc)}</td><td class="note">${esc(x.note)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Бу даврда чегирма қилинмаган</p>'}
 
   ${mprods.length ? `<h3 class="sec">Сотилган дона (соф): маҳсулот ва филиал</h3>
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Маҳсулот</th>${brs.map((b) => `<th class="num">${esc(b)}</th>`).join('')}<th class="num">Жами</th></tr></thead>
@@ -1487,9 +1864,10 @@ async function exportExcel(btn) {
       title: `${net} — ҳисобот`, sub: filt,
       cols: [{ h: 'Кўрсаткич', w: 34 }, { h: 'Қиймат', w: 20, num: true }, { h: 'Изоҳ', w: 40 }],
       rows: [
-        ['Сотув (қайтаришсиз)', t.gross, cur()],
+        ['Сотув (нархда)', t.gross, cur()],
+        ['Чегирма', -t.discount, `${t.discDocs} та чекда`],
         ['Қайтариш', -t.retSum, `${t.retDocs} та ҳужжат, ${t.retQty} дона`],
-        ['Соф тушум', t.sum, cur()],
+        ['Соф тушум', t.sum, 'сотув − чегирма − қайтариш'],
         ['Чеклар сони', t.docs, ''],
         ['Ўртача чек', t.docs ? Math.round(t.gross / t.docs) : 0, cur()],
         ['Сотилган дона (соф)', t.qty, `сотилган ${t.soldQty}, қайтарилган ${t.retQty}`],
@@ -1497,24 +1875,28 @@ async function exportExcel(btn) {
         ['Приход', t.inQty, 'дона'],
         ['Ўтказма', t.trQty, 'дона'],
         ['Бекор қилинган ҳужжатлар', t.cancelled, ''],
+        ['Шу даврда қарзга сотилди', d.debt.given, cur()],
+        ['Шу даврда қарз тўланди', d.debt.paid, cur()],
+        ['Ҳозир очиқ қарз', d.debt.open, `${d.debt.openCount} та қарздор`],
       ],
     });
-    const netRow = w1.getRow(7);
+    const netRow = w1.getRow(8);
     netRow.eachCell((c) => { c.font = { bold: true, size: 12, color: { argb: XL.forest } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.honey } }; });
     w1.getCell('B6').font = { color: { argb: XL.red } };
+    w1.getCell('B7').font = { color: { argb: XL.red } };
 
     // 2. Филиаллар
     const w2 = wb.addWorksheet('Филиаллар');
     xlTable(w2, {
       title: 'Филиаллар бўйича', sub: filt,
-      cols: [{ h: 'Филиал', w: 28 }, { h: 'Сотув', w: 15, num: true, sum: true }, { h: 'Қайтариш', w: 14, num: true, sum: true },
+      cols: [{ h: 'Филиал', w: 28 }, { h: 'Сотув (нархда)', w: 15, num: true, sum: true }, { h: 'Чегирма', w: 13, num: true, sum: true }, { h: 'Қайтариш', w: 14, num: true, sum: true },
         { h: 'Соф тушум', w: 16, num: true, sum: true }, { h: 'Чеклар', w: 10, num: true, sum: true }, { h: 'Дона (соф)', w: 12, num: true, sum: true },
         { h: 'Приход', w: 11, num: true, sum: true }, { h: 'Ўтказма кирди', w: 13, num: true, sum: true }, { h: 'Ўтказма чиқди', w: 13, num: true, sum: true },
         { h: 'Ҳозирги қолдиқ', w: 14, num: true, sum: true }],
       rows: brs.map((b) => {
         const x = d.byBranch[b] || {};
         const st = (S.cfg.products || []).reduce((a, p) => a + stockOf(b, p.name), 0);
-        return [b, x.gross || 0, -(x.retSum || 0), x.sum || 0, x.docs || 0, x.qty || 0, x.inQty || 0, x.trIn || 0, x.trOut || 0, st];
+        return [b, x.gross || 0, -(x.disc || 0), -(x.retSum || 0), x.sum || 0, x.docs || 0, x.qty || 0, x.inQty || 0, x.trIn || 0, x.trOut || 0, st];
       }),
       total: true,
     });
@@ -1557,18 +1939,66 @@ async function exportExcel(btn) {
       total: true,
     });
 
+    // 6б. Тўлов турлари, чегирмалар, қарздорлар, молия
+    xlTable(wb.addWorksheet('Тўлов турлари'), {
+      title: 'Тўлов турлари бўйича сотув (чегирмадан кейин)', sub: filt,
+      cols: [{ h: 'Тўлов тури', w: 26 }, { h: 'Чеклар', w: 10, num: true, sum: true }, { h: 'Сумма', w: 16, num: true, sum: true }],
+      rows: d.byPay.map((x) => [x.pay, x.docs, x.sum]),
+      total: true,
+    });
+    const wD = wb.addWorksheet('Чегирмалар', { properties: { tabColor: { argb: 'FFF2A93B' } } });
+    xlTable(wD, {
+      title: 'Чегирмалар', sub: filt,
+      cols: [{ h: 'Сана', w: 11, date: true }, { h: 'Вақт', w: 7 }, { h: 'Чек', w: 9 }, { h: 'Филиал', w: 24 }, { h: 'Мижоз', w: 26 },
+        { h: 'Сотувчи', w: 14 }, { h: 'Нархда', w: 14, num: true, sum: true }, { h: 'Чегирма', w: 13, num: true, sum: true },
+        { h: 'Тўланди', w: 14, num: true, sum: true }, { h: 'Сабаби', w: 40 }],
+      rows: d.discounts.map((x) => [xlDate(x.date), x.time, x.doc, x.branch, x.client, x.op, x.gross, x.disc, x.gross - x.disc, x.note]),
+      total: true,
+    });
+    const [dbt, fin] = await Promise.all([
+      api('debts', { status: 'open', branch: r.branch }),
+      api('finance', { from, to, branch: r.branch }),
+    ]);
+    xlTable(wb.addWorksheet('Қарздорлар'), {
+      title: `Очиқ қарзлар (${dLabel(todayISO())} ҳолатига)`, sub: `Филиал: ${r.branch || 'ҳаммаси'} · тўлаш санаси яқинлари тепада`,
+      cols: [{ h: 'Мижоз', w: 26 }, { h: 'Чек', w: 9 }, { h: 'Сана', w: 11, date: true }, { h: 'Филиал', w: 24 },
+        { h: 'Қарз', w: 13, num: true, sum: true }, { h: 'Тўланди', w: 13, num: true, sum: true }, { h: 'Қолди', w: 13, num: true, sum: true },
+        { h: 'Тўлаш санаси', w: 13, date: true }, { h: 'Изоҳ', w: 40 }],
+      rows: dbt.rows.map((x) => [x.client, x.doc, xlDate(x.date), x.branch, x.amount, x.paid + x.cut, x.left, x.due ? xlDate(x.due) : null, x.note]),
+      total: true,
+    });
+    const wF = wb.addWorksheet('Молия');
+    const posF = xlTable(wF, {
+      title: 'Молия: кирим ва чиқим', sub: `Давр: ${period} · Филиал: ${r.branch || 'ҳаммаси'} · Кассадаги нақд (ҳозир): ${fmt(fin.tot.cash)} ${cur()}`,
+      cols: [{ h: 'Сана', w: 11, date: true }, { h: 'Вақт', w: 7 }, { h: '№', w: 9 }, { h: 'Филиал', w: 24 }, { h: 'Тоифа', w: 22 },
+        { h: 'Тури', w: 22 }, { h: 'Тўлов', w: 12 }, { h: 'Кирим', w: 14, num: true, sum: true }, { h: 'Чиқим', w: 14, num: true, sum: true },
+        { h: 'Изоҳ', w: 40 }, { h: 'Оператор', w: 13 }, { h: 'Ҳолат', w: 8 }],
+      rows: fin.rows.slice().reverse().map((x) => [xlDate(x.date), x.time, x.no, x.branch, FIN_CAT[x.cat] || x.cat, x.sub, x.pay,
+        x.dir === 'in' && x.status !== CANCEL ? x.amount : null, x.dir === 'out' && x.status !== CANCEL ? x.amount : null,
+        [x.note, x.cancel].filter(Boolean).join(' · '), x.op, x.status]),
+      total: true,
+    });
+    fin.rows.slice().reverse().forEach((x, k) => {
+      const row = wF.getRow(posF.headRow + 1 + k);
+      row.getCell(8).font = { color: { argb: XL.leaf } };
+      row.getCell(9).font = { color: { argb: XL.red } };
+      if (x.status === CANCEL) row.eachCell({ includeEmpty: true }, (c) => { c.font = { italic: true, strike: true, color: { argb: XL.grey } }; });
+    });
+
     // 7. Ҳаракатлар (батафсил)
     const w7 = wb.addWorksheet('Ҳаракатлар', { properties: { tabColor: { argb: XL.leaf } } });
     const cols7 = [{ h: 'Сана', w: 11, date: true }, { h: 'Вақт', w: 7 }, { h: 'Ҳужжат', w: 9 }, { h: 'Тури', w: 11 },
       { h: 'Филиал', w: 24 }, { h: 'Қаерга', w: 20 }, { h: 'Маҳсулот', w: 36 }, { h: 'Сони', w: 7, num: true, sum: true },
       { h: 'Нарх', w: 11, num: true }, { h: 'Сумма', w: 13, num: true, sum: true }, { h: 'Мижоз Ф.И.Ш', w: 24 }, { h: 'Юборган врач', w: 18 },
-      { h: 'Ҳолат', w: 8 }, { h: 'Оператор', w: 13 }, { h: 'Изоҳ', w: 34 }, { h: 'Асос ҳужжат', w: 11 }];
+      { h: 'Ҳолат', w: 8 }, { h: 'Оператор', w: 13 }, { h: 'Изоҳ', w: 34 }, { h: 'Асос ҳужжат', w: 11 },
+      { h: 'Тўлов тури', w: 12 }, { h: 'Чегирма (чек)', w: 13, num: true, sum: true }, { h: 'Чегирма сабаби', w: 30 }];
     const rows7 = ex.rows.map((x) => {
       const ret = x[3] === T.RET;
-      return [xlDate(x[0]), x[1], x[2], x[3], x[4], x[5], x[6], ret ? -x[7] : x[7], x[8], x[9] == null ? null : (ret ? -x[9] : x[9]), x[10], x[11], x[12], x[13], x[14], x[15]];
+      return [xlDate(x[0]), x[1], x[2], x[3], x[4], x[5], x[6], ret ? -x[7] : x[7], x[8], x[9] == null ? null : (ret ? -x[9] : x[9]), x[10], x[11], x[12], x[13], x[14], x[15],
+        x[16] || '', x[17] ? -x[17] : null, x[18] || ''];
     });
     const pos = xlTable(w7, {
-      title: 'Ҳамма ҳаракатлар', sub: filt + ' · Қайтариш манфий (−) ёзилган, «Сумма» устуни жами — соф тушум',
+      title: 'Ҳамма ҳаракатлар', sub: filt + ' · Қайтариш ва чегирма манфий (−). «Сумма» + «Чегирма» = соф тушум (приход/ўтказмада сумма йўқ)',
       cols: cols7, rows: rows7, total: true,
     });
     ex.rows.forEach((x, k) => {
@@ -1576,6 +2006,7 @@ async function exportExcel(btn) {
       const tc = row.getCell(4);
       tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_TYPE_FILL[x[3]] || XL.white } };
       if (x[3] === T.RET) [8, 10].forEach((i) => { row.getCell(i).font = { color: { argb: XL.red } }; });
+      if (x[17]) row.getCell(18).font = { color: { argb: 'FFB7791F' } };
       if (x[12] === CANCEL) row.eachCell({ includeEmpty: true }, (c) => { c.font = { italic: true, strike: true, color: { argb: XL.grey } }; });
       row.getCell(15).alignment = { wrapText: true, vertical: 'top' };
     });
@@ -1603,8 +2034,10 @@ async function exportExcel(btn) {
 
 /* ───────────── sozlamalar (admin) ───────────── */
 
-const SET_TABS = [['products', 'Маҳсулотлар'], ['branches', 'Филиаллар'], ['doctors', 'Врачлар'], ['users', 'Фойдаланувчилар'], ['general', 'Умумий']];
-const SET_KIND = { products: 'product', branches: 'branch', doctors: 'doctor', users: 'user' };
+const SET_TABS = [['products', 'Маҳсулотлар'], ['branches', 'Филиаллар'], ['doctors', 'Врачлар'], ['users', 'Фойдаланувчилар'], ['payTypes', 'Тўлов турлари'], ['finCats', 'Чиқим турлари'], ['general', 'Умумий']];
+const SET_KIND = { products: 'product', branches: 'branch', doctors: 'doctor', users: 'user', payTypes: 'paytype', finCats: 'fincat' };
+const PAY_KINDS = [['cash', 'Нақд пул — кассага тушади'], ['card', 'Карта / терминал'], ['transfer', 'Ўтказма (ЯТТ, МЧЖ, Click ...)'], ['debt', 'Қарз — қарздорлар рўйхатига тушади']];
+const FIN_GRPS = [['exp', 'Аптека харажати'], ['cash', 'Кассадан пул ечиш']];
 
 function viewSettings() {
   const st = S.set;
@@ -1666,6 +2099,16 @@ function setBody() {
   if (tab === 'doctors') {
     return `${search}<div class="tbl-wrap"><table class="tbl set" id="set-tbl"><thead><tr><th>Врач</th><th>Изоҳ</th><th>Ҳолат</th><th></th></tr></thead>
       <tbody>${d.doctors.map((x) => `<tr class="${x.active ? '' : 'inactive'}" data-name="${esc(x.name.toLowerCase())}"><td class="b">${esc(x.name)}</td><td class="muted">${esc(x.note)}</td><td>${stateTag(x.active)}</td><td class="act">${editBtn(x.id)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (tab === 'payTypes') {
+    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Тўлов тури</th><th>Қандай ишлайди</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.payTypes.map((x) => `<tr class="${x.active ? '' : 'inactive'}"><td class="b">${payTag(x.name) || esc(x.name)}</td><td class="muted">${esc((PAY_KINDS.find((k) => k[0] === x.kind) || [, x.kind])[1])}</td><td>${stateTag(x.active)}</td><td class="act">${editBtn(x.id)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint soft">${ic('note')}<span>Сотувда шу турлар тугма бўлиб чиқади. «Қарз» туридаги сотув молияга тушмайди — қарздорлар рўйхатига тушади, мижоз тўлаганда кирим бўлади. Номни ўзгартирсангиз, эски ёзувлар ҳам янги ном билан кўринади.</span></p>`;
+  }
+  if (tab === 'finCats') {
+    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Тоифа</th><th>Гуруҳ</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.finCats.map((x) => `<tr class="${x.active ? '' : 'inactive'}"><td class="b">${esc(x.name)}</td><td>${x.grp === 'exp' ? '<span class="tag red">Аптека харажати</span>' : '<span class="tag plum">Кассадан пул ечиш</span>'}</td><td>${stateTag(x.active)}</td><td class="act">${editBtn(x.id)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint soft">${ic('note')}<span>Молия бўлимида «Харажат ёзиш» ва «Кассадан пул ечиш» тугмаларида шу тоифалар чиқади. «Бошқа» билан бошланадиган тоифага изоҳ мажбурий.</span></p>`;
   }
   if (tab === 'users') {
     return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Исм</th><th>Роль</th><th>Филиал</th><th>Ҳолат</th><th></th></tr></thead>
@@ -1735,6 +2178,16 @@ function editItem(kind, item) {
       { key: 'note', label: 'Изоҳ', value: item && item.note, full: true },
       { key: 'active', label: 'Фаол — рўйхатда кўринади', type: 'check', value: item ? item.active : true, full: true },
     ]],
+    paytype: [item ? 'Тўлов турини таҳрирлаш' : 'Янги тўлов тури', [
+      { key: 'name', label: 'Номи', value: item && item.name, full: true, placeholder: 'Масалан: Click, Payme, Терминал' },
+      { key: 'kind', label: 'Қандай ишлайди', type: 'select', value: item ? item.kind : 'transfer', options: PAY_KINDS, full: true },
+      { key: 'active', label: 'Фаол — сотувда кўринади', type: 'check', value: item ? item.active : true, full: true },
+    ]],
+    fincat: [item ? 'Тоифани таҳрирлаш' : 'Янги чиқим тоифаси', [
+      { key: 'grp', label: 'Гуруҳ', type: 'select', value: item ? item.grp : 'exp', options: FIN_GRPS, full: true },
+      { key: 'name', label: 'Номи', value: item && item.name, full: true, placeholder: 'Масалан: Реклама, Интернет' },
+      { key: 'active', label: 'Фаол — рўйхатда кўринади', type: 'check', value: item ? item.active : true, full: true },
+    ]],
     user: [item ? 'Фойдаланувчини таҳрирлаш' : 'Янги фойдаланувчи', [
       { key: 'name', label: 'Исми', value: item && item.name, full: true, placeholder: 'Масалан: Дилноза (1-филиал)' },
       { key: 'role', label: 'Роль', type: 'select', value: item ? item.role : 'seller', options: [['seller', 'Сотувчи'], ['admin', 'Админ']] },
@@ -1759,6 +2212,7 @@ function fieldHTML(f) {
   const cls = `field ${f.full ? 'full' : ''}`;
   if (f.type === 'check') return `<label class="check ${f.full ? 'full' : ''}"><input type="checkbox" name="${f.key}" ${f.value ? 'checked' : ''}><span>${esc(f.label)}</span></label>`;
   if (f.type === 'select') return `<label class="${cls}" data-field="${f.key}"><span>${esc(f.label)}</span><select name="${f.key}">${f.options.map(([v, t]) => `<option value="${esc(v)}" ${v === f.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+  if (f.type === 'date') return `<label class="${cls}" data-field="${f.key}"><span>${esc(f.label)}</span><input type="date" name="${f.key}" value="${esc(f.value || '')}"></label>`;
   const numeric = ['money', 'int', 'pin'].includes(f.type);
   return `<label class="${cls}" data-field="${f.key}"><span>${esc(f.label)}</span><input name="${f.key}" value="${esc(f.value == null ? '' : f.value)}" ${numeric ? 'inputmode="numeric"' : ''} ${f.type === 'pin' ? 'type="password" autocomplete="new-password"' : 'autocomplete="off"'} placeholder="${esc(f.placeholder || '')}" class="${f.type === 'money' ? 'money' : ''}"></label>`;
 }
