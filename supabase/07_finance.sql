@@ -216,14 +216,11 @@ begin
   if pk is null then perform apteka.fail('Тўлов турини танланг'); end if;
   raw := apteka.norm_items(req->'items', true);
   for x in select value from jsonb_array_elements(raw) loop
-    -- оддий фойдаланувчи фақат админ қўйган нархда сотади
-    if u.role <> 'admin' then
-      if coalesce((x->>'lp')::numeric, 0) <= 0 then
-        perform apteka.fail('«' || (x->>'name') || '»: нархи қўйилмаган — админга айтинг');
-      end if;
-      x := x || jsonb_build_object('price', (x->>'lp')::numeric);
+    -- сотувда нарх ўзгармайди: ҳамма (админ ҳам) Созламалардаги нархда сотади
+    if coalesce((x->>'lp')::numeric, 0) <= 0 then
+      perform apteka.fail('«' || (x->>'name') || '»: нархи қўйилмаган — Созламалар → Маҳсулотларда нарх қўйинг');
     end if;
-    if coalesce((x->>'price')::numeric, 0) <= 0 then perform apteka.fail('«' || (x->>'name') || '»: нархини ёзинг'); end if;
+    x := x || jsonb_build_object('price', (x->>'lp')::numeric);
     x := x || jsonb_build_object('sum', (x->>'price')::numeric * (x->>'qty')::int);
     items := items || jsonb_build_array(x);
     total := total + (x->>'sum')::numeric;

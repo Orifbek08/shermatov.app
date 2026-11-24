@@ -446,7 +446,7 @@ function linesHTML(kind) {
         <input data-f="qty" data-i="${i}" inputmode="numeric" value="${esc(l.qty)}" aria-label="Сони">
         <button type="button" data-act="qty-inc" data-i="${i}" aria-label="Кўпайтириш">${ic('plus')}</button>
       </div>
-      ${sale ? `<input class="money ${isAdmin() ? '' : 'locked'}" data-f="price" data-i="${i}" inputmode="numeric" value="${l.price === '' ? '' : fmt(l.price)}" aria-label="Нарх" placeholder="Нарх" ${isAdmin() ? '' : 'readonly tabindex="-1" title="Нархни фақат админ ўзгартиради. Арзонроқ сотиш учун «Чегирма»ни ёқинг"'}>
+      ${sale ? `<input class="money locked" data-f="price" data-i="${i}" value="${l.price === '' ? '' : fmt(l.price)}" aria-label="Нарх" placeholder="—" readonly tabindex="-1" title="Нарх Созламалар → Маҳсулотларда ўзгартирилади. Арзонроқ сотиш учун «Чегирма»ни ёқинг">
       <input class="money calc" data-f="sum" data-i="${i}" value="${l.sum === '' ? '' : fmt(l.sum)}" aria-label="Сумма" placeholder="Сумма" readonly tabindex="-1">` : ''}
       <button class="icon-btn x" data-act="del-line" data-i="${i}" title="Қаторни ўчириш" aria-label="Қаторни ўчириш">${ic('x')}</button>
     </div>`).join('');
@@ -799,9 +799,9 @@ function onViewInput(e) {
     updateTotals(kind);
     f.lines.forEach((_, j) => updateLineMeta(kind, j));
     if (kind === 'transfer') { const h = $('#to-hint'); if (h) h.innerHTML = toHint(); }
-    if (name && kind === 'sale' && !l.price) { const pr = row && row.querySelector('[data-f="price"]'); if (pr) pr.focus(); }
-  } else if (fld === 'qty' || fld === 'price') {
-    l[fld] = fld === 'price' ? num(t.value) : t.value.replace(/[^\d]/g, '');
+    if (name && kind === 'sale' && !l.price) toast(`«${name}»: нархи қўйилмаган — Созламалар → Маҳсулотларда нарх қўйинг`, 'err');
+  } else if (fld === 'qty') {
+    l.qty = t.value.replace(/[^\d]/g, '');
     if (kind === 'sale' && !l.manual && l.product) {
       l.sum = num(l.qty) * num(l.price);
       const s = t.closest('.line').querySelector('[data-f="sum"]');
@@ -955,8 +955,8 @@ async function submit(kind) {
   const payload = { branch: S.branch, note: f.note, rid: f.rid };
   if (kind === 'sale') {
     if (!f.client.trim()) { toast('Мижознинг исм-фамилиясини ёзинг', 'err'); const c = $('#f-client'); if (c) c.focus(); return; }
-    const free = lines.find((l) => !(num(l.sum) > 0));
-    if (free) return toast(`«${free.product}»: нарх ёки суммани ёзинг`, 'err');
+    const free = lines.find((l) => !(num(l.price) > 0));
+    if (free) return toast(`«${free.product}»: нархи қўйилмаган — Созламалар → Маҳсулотларда нарх қўйинг`, 'err');
     payload.client = f.client; payload.doctor = f.doctor;
     payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty), price: num(l.price) }));
     const total = lines.reduce((a, l) => a + num(l.sum), 0);
