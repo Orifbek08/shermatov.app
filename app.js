@@ -684,7 +684,7 @@ function groupDocs(rows) {
     if (!g) {
       g = { doc: r.doc, date: r.date, time: r.time, type: r.type, branch: r.branch, to: r.to, client: r.client,
         doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', pay: r.pay || '',
-        disc: Number(r.disc) || 0, discNote: r.discNote || '', lines: [], sum: 0, qty: 0 };
+        disc: Number(r.disc) || 0, discNote: r.discNote || '', opPhone: r.opPhone || '', lines: [], sum: 0, qty: 0 };
       m.set(r.doc, g);
     }
     g.lines.push(r);
@@ -714,6 +714,7 @@ function docCard(g) {
   return `<article class="doc ${off ? 'off' : ''}">
     <header><b class="no">${esc(g.doc)}</b><span class="tm">${esc(g.time)}</span>${showBr ? `<span class="br">${esc(g.branch)}</span>` : ''}
       ${off ? '<span class="tag red">Бекор қилинган</span>' : ''}
+      ${g.type === T.OUT ? `<button class="mini-act rc-btn" data-act="rc-print" data-doc="${esc(g.doc)}" title="Чекни чоп этиш" aria-label="${esc(g.doc)} чекини чоп этиш">${ic('print')}</button>` : ''}
       ${canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(g.doc)}" title="Ҳужжатни бекор қилиш">Бекор қилиш</button>` : ''}</header>
     ${who}
     <ul>${lines}</ul>
@@ -897,6 +898,8 @@ async function onViewClick(e) {
     retFrom(b.dataset.doc);
   } else if (act === 'xls') {
     exportExcel(b);
+  } else if (act === 'rc-print') {
+    printReceipt(docGroup(b.dataset.doc));
   } else if (act === 'd-status') {
     S.debts.status = b.dataset.v; S.debts.data = null; S.debts.error = ''; renderView();
   } else if (act === 'd-load') {
@@ -1005,6 +1008,7 @@ async function submit(kind) {
     renderView();
     const first = document.querySelector(kind === 'sale' ? '#f-client' : '#lines .prod-in');
     if (first) first.focus();
+    if (kind === 'sale' && !j.dup) askReceipt(j.doc);
   } catch (err) {
     f.busy = false; setSubmitBusy(kind, false);
     toast(err.message, 'err');
@@ -1033,6 +1037,70 @@ async function cancelDoc(doc) {
     S.rep.data = null; S.fin.data = null; S.debts.data = null;
     if (S.page === 'history') { S.hist.data = null; loadHistory(); } else renderView();
   } catch (err) { toast(err.message, 'err'); }
+}
+
+/* ───────────── chek (80 мм термопринтер, brauzer orqali) ───────────── */
+
+function receiptHTML(g) {
+  const br = (S.cfg.branches || []).find((b) => b.name === g.branch) || {};
+  const net = g.sum - g.disc;
+  const debt = payKind(g.pay) === 'debt';
+  const phone = g.opPhone || (g.op === S.user.name ? S.user.phone : '') || '';
+  const items = g.lines.map((l) => `<div class="rc-it"><div class="rc-nm">${esc(l.product)}</div>
+    <div class="rc-r"><span>${fmt(l.qty)} × ${fmt(l.price)}</span><b>${fmt(l.sum)}</b></div></div>`).join('');
+  return `<div class="rc">
+    <div class="rc-c rc-name">${esc(S.cfg.name || 'Др. Шерматов дорихоналари')}</div>
+    <div class="rc-c">${esc(g.branch)}</div>
+    ${br.addr ? `<div class="rc-c rc-sm">${esc(br.addr)}</div>` : ''}
+    ${br.phone ? `<div class="rc-c rc-sm">Тел: ${esc(br.phone)}</div>` : ''}
+    <div class="rc-line"></div>
+    <div class="rc-c rc-title">СОТУВ ЧЕКИ № ${esc(g.doc)}</div>
+    ${g.status === CANCEL ? '<div class="rc-c rc-warn">*** БЕКОР ҚИЛИНГАН ***</div>' : ''}
+    <div class="rc-kv"><span>Сана</span><b>${dLabel(g.date)} ${esc(g.time)}</b></div>
+    <div class="rc-kv"><span>Мижоз</span><b>${esc(g.client)}</b></div>
+    ${g.doctor ? `<div class="rc-kv"><span>Юборган врач</span><b>${esc(g.doctor)}</b></div>` : ''}
+    <div class="rc-line"></div>
+    ${items}
+    <div class="rc-line"></div>
+    ${g.disc ? `<div class="rc-kv"><span>Жами</span><b>${fmt(g.sum)}</b></div><div class="rc-kv"><span>Чегирма</span><b>−${fmt(g.disc)}</b></div>` : ''}
+    <div class="rc-kv rc-tot"><span>${debt ? 'ҚАРЗГА' : 'ТЎЛОВ'}</span><b>${fmt(net)} ${esc(cur())}</b></div>
+    ${g.pay ? `<div class="rc-kv"><span>Тўлов тури</span><b>${esc(g.pay)}</b></div>` : ''}
+    <div class="rc-line"></div>
+    <div class="rc-kv"><span>Кассир</span><b>${esc(g.op)}</b></div>
+    ${phone ? `<div class="rc-kv"><span>Кассир тел.</span><b>${esc(phone)}</b></div>` : ''}
+    <div class="rc-c rc-bye">Саломат бўлинг!</div>
+  </div>`;
+}
+
+function printReceipt(g) {
+  if (!g) return;
+  let el = document.getElementById('receipt');
+  if (!el) { el = document.createElement('div'); el.id = 'receipt'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); }
+  el.innerHTML = receiptHTML(g);
+  let st = document.getElementById('print-page');
+  if (!st) { st = document.createElement('style'); st.id = 'print-page'; document.head.appendChild(st); }
+  // қоғоз ўлчамини принтер драйвери белгилайди — акс ҳолда Chrome чекни варақ ўртасига қўяди
+  st.textContent = '@page { size: auto; margin: 0; }';
+  document.body.dataset.print = 'receipt';
+  const done = () => { delete document.body.dataset.print; st.textContent = ''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => { window.print(); setTimeout(() => { if (document.body.dataset.print) done(); }, 1500); }, 80);
+}
+
+function docGroup(doc) {
+  const src = S.today.concat((S.hist.data && S.hist.data.rows) || []);
+  return groupDocs(src.filter((r) => r.doc === doc))[0];
+}
+
+async function askReceipt(doc) {
+  const g = docGroup(doc);
+  if (!g) return;
+  const yes = await modal({
+    title: 'Чек керакми?',
+    body: `<b>${esc(g.doc)}</b> · ${esc(g.client)} · ${money(g.sum - g.disc)}`,
+    ok: 'Ҳа, чек чиқариш', cancel: 'Йўқ',
+  });
+  if (yes) printReceipt(g);
 }
 
 /* ───────────── qaytarish ───────────── */
@@ -1633,7 +1701,7 @@ function histTable(d) {
           <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b ${r.type === T.RET ? 'neg' : ''}">${r.sum != null ? (r.type === T.RET ? '−' : '') + fmt(r.sum) : ''}</td>
           <td>${first ? esc(r.client) : ''}</td><td>${first ? esc(r.doctor) : ''}</td><td class="nw muted">${first ? esc(r.op) : ''}</td>
           <td class="note">${first ? (r.ref ? `<b>Асос: ${esc(r.ref)}</b>${r.note ? ' · ' : ''}` : '') + (Number(r.disc) ? `<b class="discn">Чегирма −${fmt(r.disc)}${r.discNote ? ': ' + esc(r.discNote) : ''}</b>${r.note ? ' · ' : ''}` : '') + esc(r.note) : ''}</td>
-          <td class="acts">${first && g && g.type === T.OUT && g.status !== CANCEL && (isAdmin() || g.branch === S.user.branch) ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
+          <td class="acts">${first && g && g.type === T.OUT ? `<button class="mini-act" data-act="rc-print" data-doc="${esc(r.doc)}" title="Чекни чоп этиш">${ic('print')}Чек</button>` : ''}${first && g && g.type === T.OUT && g.status !== CANCEL && (isAdmin() || g.branch === S.user.branch) ? `<button class="mini-act" data-act="ret-from" data-doc="${esc(r.doc)}">Қайтариш</button>` : ''}${first && g && canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(r.doc)}">Бекор қилиш</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
@@ -2111,8 +2179,8 @@ function setBody() {
       <p class="hint soft">${ic('note')}<span>Молия бўлимида «Харажат ёзиш» ва «Кассадан пул ечиш» тугмаларида шу тоифалар чиқади. «Бошқа» билан бошланадиган тоифага изоҳ мажбурий.</span></p>`;
   }
   if (tab === 'users') {
-    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Исм</th><th>Роль</th><th>Филиал</th><th>Ҳолат</th><th></th></tr></thead>
-      <tbody>${d.users.map((u) => `<tr class="${u.active ? '' : 'inactive'}"><td class="b">${esc(u.name)}</td><td>${u.role === 'admin' ? '<span class="tag plum">Админ</span>' : '<span class="tag sky">Сотувчи</span>'}</td><td>${esc(u.branch || '—')}</td><td>${stateTag(u.active)}</td><td class="act">${editBtn(u.id)}</td></tr>`).join('')}</tbody></table></div>
+    return `<div class="tbl-wrap"><table class="tbl set"><thead><tr><th>Исм</th><th>Роль</th><th>Филиал</th><th>Телефон</th><th>Ҳолат</th><th></th></tr></thead>
+      <tbody>${d.users.map((u) => `<tr class="${u.active ? '' : 'inactive'}"><td class="b">${esc(u.name)}</td><td>${u.role === 'admin' ? '<span class="tag plum">Админ</span>' : '<span class="tag sky">Сотувчи</span>'}</td><td>${esc(u.branch || '—')}</td><td class="nw muted">${esc(u.phone || '')}</td><td>${stateTag(u.active)}</td><td class="act">${editBtn(u.id)}</td></tr>`).join('')}</tbody></table></div>
       <p class="hint soft">${ic('note')}<span>PIN ўзгартирилса, у фойдаланувчи ҳамма қурилмадан чиқиб кетади ва янги PIN билан киради. Ҳар сотувчига алоҳида PIN беринг.</span></p>`;
   }
   return '';
@@ -2192,6 +2260,7 @@ function editItem(kind, item) {
       { key: 'name', label: 'Исми', value: item && item.name, full: true, placeholder: 'Масалан: Дилноза (1-филиал)' },
       { key: 'role', label: 'Роль', type: 'select', value: item ? item.role : 'seller', options: [['seller', 'Сотувчи'], ['admin', 'Админ']] },
       { key: 'branch', label: 'Филиал', type: 'select', value: item ? item.branch : '', options: brOpts },
+      { key: 'phone', label: 'Телефон (чекда «Кассир тел.» бўлиб чиқади)', value: item && item.phone, placeholder: '+998 90 123 45 67', full: true },
       { key: 'pin', label: item ? 'Янги PIN' : 'PIN', type: 'pin', value: '', placeholder: item ? 'Ўзгартирмаслик учун бўш қолдиринг' : '4–12 та рақам', full: true },
       { key: 'active', label: 'Фаол — тизимга кира олади', type: 'check', value: item ? item.active : true, full: true },
     ]],
