@@ -67,7 +67,7 @@ const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="no
 
 const S = {
   token: lsGet(LS.token) || '',
-  user: null, cfg: null, stock: {}, today: [], ver: -1, cfgHash: '',
+  user: null, cfg: null, stock: {}, today: [], pending: [], ver: -1, cfgHash: '',
   branch: '', page: lsGet(LS.page) || 'sale',
   net: 'idle', lastSync: 0, syncing: false,
   forms: {},
@@ -180,11 +180,12 @@ function applyState(j) {
   if (j.cfgHash) S.cfgHash = j.cfgHash;
   if (j.stock) S.stock = j.stock;
   if (j.today) S.today = j.today;
+  if (Array.isArray(j.pending)) S.pending = j.pending;
   if (j.ver != null) S.ver = j.ver;
   if (S.user && !isAdmin()) S.branch = S.user.branch;
   if (S.branch && S.cfg && !branchNames().includes(S.branch)) S.branch = '';
   S.lastSync = Date.now();
-  lsSet(LS.cache, JSON.stringify({ user: S.user, cfg: S.cfg, cfgHash: S.cfgHash, stock: S.stock, today: S.today, ver: S.ver }));
+  lsSet(LS.cache, JSON.stringify({ user: S.user, cfg: S.cfg, cfgHash: S.cfgHash, stock: S.stock, today: S.today, pending: S.pending, ver: S.ver }));
 }
 
 function setNet(n) {
@@ -208,6 +209,7 @@ async function sync(force) {
       const cfgChanged = !!j.cfg;
       applyState(j);
       if (cfgChanged && S.page !== 'settings') renderApp(); else softRefresh();
+      updateBadges();
     }
   } catch (e) { /* holat belgisi ko'rsatadi */ } finally {
     S.syncing = false; setNet(S.net);
@@ -335,6 +337,7 @@ function renderApp() {
         <div class="ph-r">${netHTML()}${brSel}
           <button class="icon-btn m-only" id="logout-m" title="Чиқиш" aria-label="Чиқиш">${ic('logout')}</button></div>
       </header>
+      <div id="pend-bar"></div>
       <main id="view"></main>
     </div>
     <nav class="tabbar" id="tabbar" aria-label="Бўлимлар">${navButtons(pages.filter((p) => !p.more))}
@@ -350,13 +353,15 @@ function renderApp() {
   };
   $('#tabs').onclick = go;
   $('#tabbar').onclick = go;
+  $('#pend-bar').onclick = (e) => { const b = e.target.closest('[data-go]'); if (b) goPage(b.dataset.go); };
   const bs = $('#branch-sel');
   if (bs) bs.onchange = () => {
     S.branch = bs.value; lsSet(LS.branch, S.branch);
     S.hist.data = null; S.fin.data = null; S.debts.data = null; S.fin.error = ''; S.debts.error = '';
-    renderView(true);
+    renderView(true); updateBadges();
   };
   renderView(true);
+  updateBadges();
 }
 
 function goPage(id) {
@@ -373,6 +378,7 @@ function goPage(id) {
   const mb = $('#more-btn'); if (mb) mb.classList.toggle('on', !!p.more);
   $('#page-title').textContent = p.t; $('#page-sub').textContent = p.sub;
   renderView(true);
+  updateBadges();
   window.scrollTo({ top: 0 });
 }
 
@@ -381,7 +387,7 @@ function openMore(list) {
   const root = $('#modal-root');
   root.innerHTML = `<div class="ov sheet-ov"><div class="bsheet" role="dialog" aria-modal="true" aria-label="Бўлимлар">
     <span class="grab"></span>
-    ${list.map((p) => `<button data-go="${p.id}" class="${p.id === S.page ? 'on' : ''}">${ic(p.ic)}<span><b>${p.t}</b><small>${p.sub}</small></span></button>`).join('')}
+    ${list.map((p) => `<button data-go="${p.id}" class="${p.id === S.page ? 'on' : ''}">${ic(p.ic)}<span><b>${p.t}</b><small>${p.sub}</small></span>${p.id === 'transfer' && incomingPending().length ? `<i class="nbadge">${incomingPending().length}</i>` : ''}</button>`).join('')}
   </div></div>`;
   const close = () => { const ov = $('.ov'); if (ov) ov.classList.add('out'); setTimeout(() => { root.innerHTML = ''; }, 160); };
   $('.ov').onclick = (e) => {
@@ -417,6 +423,7 @@ function softRefresh() {
   } else if (S.page === 'stock') {
     renderView();
   }
+  if (S.page === 'transfer') { const ps = $('#pend-wrap'); if (ps) ps.innerHTML = pendHTML(); }
 }
 
 function after() {
@@ -607,12 +614,13 @@ function viewIncome() {
 
 function viewTransfer() {
   const nb = needBranch();
-  if (nb) return nb;
+  if (nb) return `<div id="pend-wrap">${pendHTML()}</div>` + nb;
   const f = form('transfer');
   const others = branchNames().filter((b) => b !== S.branch);
   if (f.to && !others.includes(f.to)) f.to = '';
-  return `<div class="work">
+  return `<div id="pend-wrap">${pendHTML()}</div><div class="work">
     <section class="panel sheet">
+      <p class="hint">${ic('transfer')}<span>Товар <b>${esc(S.branch)}</b>дан дарҳол чиқади ва йўлда туради. Қабул қилувчи филиал тасдиқлагач, унинг қолдиғига тушади.</span></p>
       <div class="route">
         <div class="field"><span>Қаердан</span><div class="from">${ic('pin')}<b>${esc(S.branch)}</b></div></div>
         <span class="route-arrow">${ic('arrow')}</span>
@@ -626,7 +634,7 @@ function viewTransfer() {
       ${linesHTML('transfer')}
       <div id="to-hint" class="hint soft">${toHint()}</div>
       <label class="field note"><span>Изоҳ</span><input data-ff="note" value="${esc(f.note)}" placeholder="Ихтиёрий"></label>
-      ${checkoutHTML('transfer', 'Ўтказиш')}
+      ${checkoutHTML('transfer', 'Юбориш')}
     </section>
     <aside class="feed" id="side">${sideHTML('transfer')}</aside>
   </div>`;
@@ -722,7 +730,8 @@ function groupDocs(rows) {
     if (!g) {
       g = { doc: r.doc, date: r.date, time: r.time, type: r.type, branch: r.branch, to: r.to, client: r.client,
         doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', pay: r.pay || '',
-        disc: Number(r.disc) || 0, discNote: r.discNote || '', opPhone: r.opPhone || '', pays: r.pays || [], lines: [], sum: 0, qty: 0 };
+        disc: Number(r.disc) || 0, discNote: r.discNote || '', opPhone: r.opPhone || '', pays: r.pays || [],
+        tr: r.tr || '', trBy: r.trBy || '', trAt: r.trAt || '', trNote: r.trNote || '', lines: [], sum: 0, qty: 0 };
       m.set(r.doc, g);
     }
     g.lines.push(r);
@@ -735,6 +744,7 @@ function groupDocs(rows) {
 function canCancel(g) {
   if (g.status === CANCEL) return false;
   if (isAdmin()) return true;
+  if (g.type === T.TR && g.tr === 'pending') return g.branch === S.user.branch;
   return g.branch === S.user.branch && g.date === todayISO();
 }
 
@@ -746,12 +756,14 @@ function docCard(g) {
   if (g.type === T.OUT) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span>${g.doctor ? `<span>${ic('doctor')}${esc(g.doctor)}</span>` : ''}</div>`
     + (g.disc ? `<div class="doc-who disc"><span>${ic('tag')}Чегирма −${fmt(g.disc)}${g.discNote ? ': ' + esc(g.discNote) : ''}</span></div>` : '');
   if (g.type === T.RET) who = `<div class="doc-who"><span>${ic('user')}${esc(g.client)}</span><span>${ic('undo')}${esc(g.ref)} дан</span></div>${g.note ? `<div class="doc-who muted"><span>${ic('note')}${esc(g.note)}</span></div>` : ''}`;
-  if (g.type === T.TR) who = `<div class="doc-who"><span class="route-s">${esc(g.branch)} ${ic('arrow')} ${esc(g.to)}</span></div>`;
+  if (g.type === T.TR) who = `<div class="doc-who"><span class="route-s">${esc(g.branch)} ${ic('arrow')} ${esc(g.to)}</span></div>`
+    + (g.tr === 'accepted' && g.trBy ? `<div class="doc-who muted"><span>${ic('check')}Қабул қилди: ${esc(g.trBy)}, ${esc(g.trAt)}</span></div>` : '')
+    + (g.tr === 'rejected' ? `<div class="doc-who neg"><span>${ic('x')}Рад этди: ${esc(g.trBy)} — ${esc(g.trNote)}</span></div>` : '');
   if (g.type === T.IN && g.note) who = `<div class="doc-who"><span>${ic('note')}${esc(g.note)}</span></div>`;
   const showBr = !S.branch && g.type !== T.TR;
   return `<article class="doc ${off ? 'off' : ''}">
     <header><b class="no">${esc(g.doc)}</b><span class="tm">${esc(g.time)}</span>${showBr ? `<span class="br">${esc(g.branch)}</span>` : ''}
-      ${off ? '<span class="tag red">Бекор қилинган</span>' : ''}
+      ${off ? `<span class="tag red">${g.tr === 'rejected' ? 'Рад этилди' : 'Бекор қилинган'}</span>` : g.type === T.TR && g.tr === 'pending' ? '<span class="tag honey">Тасдиқ кутилмоқда</span>' : ''}
       ${g.type === T.OUT ? `<button class="mini-act rc-btn" data-act="rc-print" data-doc="${esc(g.doc)}" title="Чекни чоп этиш" aria-label="${esc(g.doc)} чекини чоп этиш">${ic('print')}</button>` : ''}
       ${canCancel(g) ? `<button class="mini-danger" data-act="cancel" data-doc="${esc(g.doc)}" title="Ҳужжатни бекор қилиш">Бекор қилиш</button>` : ''}</header>
     ${who}
@@ -959,6 +971,10 @@ async function onViewClick(e) {
     retFrom(b.dataset.doc);
   } else if (act === 'xls') {
     exportExcel(b);
+  } else if (act === 'tr-accept') {
+    trAccept(b.dataset.doc);
+  } else if (act === 'tr-reject') {
+    trReject(b.dataset.doc);
   } else if (act === 'rc-print') {
     printReceipt(docGroup(b.dataset.doc));
   } else if (act === 'd-status') {
@@ -1061,15 +1077,15 @@ async function submit(kind) {
   }
   if (kind === 'transfer' && !(await modal({
     title: 'Ўтказмани тасдиқланг',
-    body: `<b>${esc(S.branch)}</b> дан <b>${esc(f.to)}</b> га ${fmt(payload.items.reduce((a, x) => a + x.qty, 0))} дона ўтказилади.`,
-    ok: 'Ўтказиш',
+    body: `<b>${esc(S.branch)}</b> дан <b>${esc(f.to)}</b> га ${fmt(payload.items.reduce((a, x) => a + x.qty, 0))} дона юборилади.<br><br>Товар ҳозир қолдиғингиздан чиқади. «${esc(f.to)}» қабул қилгач, унинг қолдиғига тушади; рад этса — сизга қайтади.`,
+    ok: 'Юбориш',
   }))) return;
   f.busy = true; setSubmitBusy(kind, true);
   try {
     const j = await api(kind, payload);
     applyState(j);
     S.forms[kind] = null;
-    const label = kind === 'sale' && j.debt ? 'Қарзга сотилди' : { sale: 'Сотилди', income: 'Приход қилинди', transfer: 'Ўтказилди' }[kind];
+    const label = kind === 'sale' && j.debt ? 'Қарзга сотилди' : { sale: 'Сотилди', income: 'Приход қилинди', transfer: 'Юборилди, тасдиқ кутилмоқда' }[kind];
     if (j.debt) S.debts.data = null;
     S.fin.data = null;
     toast(`${label}: ${j.doc}${kind === 'sale' && j.total != null ? ', ' + money(j.total) : ''}${j.dup ? ' (аввал сақланган)' : ''}`, 'ok');
@@ -1107,6 +1123,110 @@ async function cancelDoc(doc) {
     S.rep.data = null; S.fin.data = null; S.debts.data = null;
     if (S.page === 'history') { S.hist.data = null; loadHistory(); } else renderView();
   } catch (err) { toast(err.message, 'err'); }
+}
+
+/* ───────────── ўтказма тасдиғи ───────────── */
+
+function myBranch() { return isAdmin() ? S.branch : S.user.branch; }
+/** Менга келган, тасдиқ кутаётган ўтказмалар (админ филиал танламаса — ҳаммаси) */
+function incomingPending() {
+  const b = myBranch();
+  return (S.pending || []).filter((p) => (b ? p.to === b : isAdmin()));
+}
+function outgoingPending() {
+  const b = myBranch();
+  return b ? (S.pending || []).filter((p) => p.from === b) : [];
+}
+function waitLabel(p) {
+  const n = -daysTo(p.date);
+  return n <= 0 ? `бугун ${esc(p.time)}` : `${n} кун кутмоқда`;
+}
+
+function pendCard(p, dir) {
+  return `<article class="pend ${dir}">
+    <header><b>${esc(p.doc)}</b><span class="muted">${dLabel(p.date)} ${esc(p.time)}</span>
+      <span class="tag honey">${dir === 'in' ? 'Тасдиқингизни кутмоқда' : 'Тасдиқланмаган'}</span></header>
+    <div class="route-s">${esc(p.from)} ${ic('arrow')} ${esc(p.to)}</div>
+    <ul>${(p.lines || []).map((l) => `<li><span>${esc(l.product)}</span><b>${fmt(l.qty)} дона</b></li>`).join('')}</ul>
+    ${p.note ? `<p class="pnote">${ic('note')}<span>${esc(p.note)}</span></p>` : ''}
+    <footer><span class="muted">${esc(p.op)} юборди · жами ${fmt(p.qty)} дона · ${waitLabel(p)}</span>
+      <span class="pbtns">${dir === 'in'
+        ? `<button class="btn soft sm" data-act="tr-reject" data-doc="${esc(p.doc)}">Рад этиш</button>
+           <button class="btn primary sm" data-act="tr-accept" data-doc="${esc(p.doc)}">${ic('check')}Қабул қилиш</button>`
+        : `<button class="mini-danger" data-act="cancel" data-doc="${esc(p.doc)}">Қайтариб олиш</button>`}</span>
+    </footer>
+  </article>`;
+}
+
+function pendHTML() {
+  const inc = incomingPending();
+  const out = outgoingPending();
+  if (!inc.length && !out.length) return '';
+  return `<section class="pend-sec">
+    ${inc.length ? `<h3 class="sec">Тасдиқ кутаётган ўтказмалар <span class="nbadge">${inc.length}</span></h3>
+      <p class="hint soft">${ic('box')}<span>Товарни санаб олинг. «Қабул қилиш» босилгач, у <b>${esc(myBranch() || 'қабул қилувчи филиал')}</b> қолдиғига тушади. Рад этилса — юборган филиалга қайтади.</span></p>
+      <div class="pend-grid">${inc.map((p) => pendCard(p, 'in')).join('')}</div>` : ''}
+    ${out.length ? `<h3 class="sec">Сиз юборган, ҳали тасдиқланмаган</h3>
+      <div class="pend-grid">${out.map((p) => pendCard(p, 'out')).join('')}</div>` : ''}
+  </section>`;
+}
+
+/** Менюдаги сон белгиси ва тепадаги огоҳлантириш */
+function updateBadges() {
+  if (!S.user) return;
+  const n = incomingPending().length;
+  document.querySelectorAll('[data-page="transfer"]').forEach((b) => {
+    let i = b.querySelector('.nbadge');
+    if (!n) { if (i) i.remove(); return; }
+    if (!i) { i = document.createElement('i'); i.className = 'nbadge'; b.appendChild(i); }
+    i.textContent = n;
+  });
+  const mb = $('#more-btn');
+  if (mb) {
+    let i = mb.querySelector('.nbadge');
+    if (!n) { if (i) i.remove(); } else { if (!i) { i = document.createElement('i'); i.className = 'nbadge'; mb.appendChild(i); } i.textContent = n; }
+  }
+  const bar = $('#pend-bar');
+  if (bar) {
+    bar.innerHTML = n && S.page !== 'transfer'
+      ? `<button class="pend-bar" data-go="transfer">${ic('transfer')}<span><b>${n} та ўтказма</b> тасдиқингизни кутмоқда</span><em>Кўриш ${ic('arrow')}</em></button>` : '';
+  }
+}
+
+async function trAccept(doc) {
+  const p = (S.pending || []).find((x) => x.doc === doc);
+  if (!p) return;
+  if (!(await modal({
+    title: `${doc} ни қабул қилиш`,
+    body: `${(p.lines || []).map((l) => `${esc(l.product)} — <b>${fmt(l.qty)} дона</b>`).join('<br>')}<br><br>Товарни санаб олдингизми? Жами <b>${fmt(p.qty)} дона</b> «${esc(p.to)}» қолдиғига қўшилади.`,
+    ok: 'Ҳа, қабул қилдим',
+  }))) return;
+  try {
+    const j = await api('trAccept', { doc });
+    applyState(j);
+    toast(`${doc} қабул қилинди — ${fmt(p.qty)} дона қолдиққа қўшилди`, 'ok');
+    S.hist.data = null; S.rep.data = null;
+    renderView(); updateBadges();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function trReject(doc) {
+  const p = (S.pending || []).find((x) => x.doc === doc);
+  if (!p) return;
+  const reason = await modal({
+    title: `${doc} ни рад этиш`,
+    body: `Товар «${esc(p.from)}» филиалига қайтади. Сабабини ёзинг — юборувчи кўради.`,
+    input: 'Сабаби', ok: 'Рад этиш', danger: true,
+  });
+  if (reason == null) return;
+  if (!reason.trim()) return toast('Рад этиш сабабини ёзинг', 'err');
+  try {
+    const j = await api('trReject', { doc, reason });
+    applyState(j);
+    toast(`${doc} рад этилди — товар ${p.from}га қайтди`, 'ok');
+    S.hist.data = null; S.rep.data = null;
+    renderView(); updateBadges();
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 /* ───────────── chek (80 мм термопринтер, brauzer orqali) ───────────── */
@@ -1655,7 +1775,11 @@ function viewStock() {
   }));
   low.sort((a, c) => a.q - c.q);
   const totals = brs.map((b) => prods.reduce((a, p) => a + stockOf(b, p.name), 0));
+  const transit = {};
+  (S.pending || []).forEach((t) => (t.lines || []).forEach((l) => { transit[t.to] = transit[t.to] || {}; transit[t.to][l.product] = (transit[t.to][l.product] || 0) + l.qty; }));
+  const trTotal = (S.pending || []).filter((t) => !me || t.to === me).reduce((a, t) => a + (t.qty || 0), 0);
   return `
+  ${trTotal ? `<p class="hint soft transit-hint">${ic('transfer')}<span><b>${fmt(trTotal)} дона</b> йўлда — ўтказма тасдиқланмаган. Жадвалда «+N йўлда» деб кўрсатилган, қолдиққа ҳали қўшилмаган.</span>${incomingPending().length ? `<button class="btn soft sm" data-act="go-transfer">Тасдиқлаш</button>` : ''}</p>` : ''}
   ${low.length ? `<section class="callout"><details ${low.length <= 6 ? 'open' : ''}>
     <summary>${ic('alert')}<span><b>${low.length} та маҳсулот кам қолган</b>${me ? ' — ' + esc(me) : ''}</span></summary>
     <ul class="low">${low.map((x) => `<li><span class="nm">${esc(x.p.name)}${me ? '' : `<small>${esc(x.b)}</small>`}</span>
@@ -1674,7 +1798,7 @@ function viewStock() {
       <tbody>${prods.map((p) => {
         const qs = brs.map((b) => stockOf(b, p.name));
         return `<tr data-name="${esc(p.name.toLowerCase())}"><td class="sticky"><span class="pn">${esc(p.name)}</span>${p.price ? `<small>${fmt(p.price)} ${cur()}</small>` : ''}</td>
-          ${qs.map((q, i) => `<td class="num ${brs[i] === me ? 'me' : ''}"><span class="qv ${q <= 0 ? 'zero' : q <= p.min ? 'low' : ''}">${fmt(q)}</span></td>`).join('')}
+          ${qs.map((q, i) => { const tq = (transit[brs[i]] || {})[p.name]; return `<td class="num ${brs[i] === me ? 'me' : ''}"><span class="qv ${q <= 0 ? 'zero' : q <= p.min ? 'low' : ''}">${fmt(q)}</span>${tq ? `<small class="transit">+${fmt(tq)} йўлда</small>` : ''}</td>`; }).join('')}
           <td class="num tot">${fmt(qs.reduce((a, c) => a + c, 0))}</td></tr>`;
       }).join('')}</tbody>
       <tfoot><tr><td class="sticky">Жами</td>${totals.map((t, i) => `<td class="num ${brs[i] === me ? 'me' : ''}">${fmt(t)}</td>`).join('')}<td class="num">${fmt(totals.reduce((a, c) => a + c, 0))}</td></tr></tfoot>
@@ -1772,7 +1896,7 @@ function histTable(d) {
         const g = docMap.get(r.doc);
         return `<tr class="${r.status === CANCEL ? 'off' : ''} ${first ? 'first' : ''}">
           <td class="nw">${first ? `${dLabel(r.date)} <span class="muted">${esc(r.time)}</span>` : ''}</td>
-          <td class="nw b">${first ? esc(r.doc) : ''}</td><td class="nw">${first ? typeTag(r.type) + (r.pay ? '<br>' + payTag(r.pay) : '') : ''}</td>
+          <td class="nw b">${first ? esc(r.doc) : ''}</td><td class="nw">${first ? typeTag(r.type) + (r.pay ? '<br>' + payTag(r.pay) : '') + (r.type === T.TR && r.status !== CANCEL && r.tr === 'pending' ? '<br><span class="tag honey">Тасдиқ кутилмоқда</span>' : '') + (r.type === T.TR && r.tr === 'rejected' ? '<br><span class="tag red">Рад этилди</span>' : '') : ''}</td>
           <td class="nw">${first ? esc(r.branch) + (r.type === T.TR ? ` <span class="muted">→</span> ${esc(r.to)}` : '') : ''}</td>
           <td>${esc(r.product)}</td><td class="num">${fmt(r.qty)}</td>
           <td class="num">${r.price != null ? fmt(r.price) : ''}</td><td class="num b ${r.type === T.RET ? 'neg' : ''}">${r.sum != null ? (r.type === T.RET ? '−' : '') + fmt(r.sum) : ''}</td>
@@ -2464,7 +2588,7 @@ function start() {
     try {
       const c = JSON.parse(lsGet(LS.cache) || 'null');
       if (c && c.user && c.cfg) {
-        S.user = c.user; S.cfg = c.cfg; S.cfgHash = c.cfgHash; S.stock = c.stock || {}; S.today = c.today || []; S.ver = c.ver;
+        S.user = c.user; S.cfg = c.cfg; S.cfgHash = c.cfgHash; S.stock = c.stock || {}; S.today = c.today || []; S.pending = c.pending || []; S.ver = c.ver;
         S.branch = isAdmin() ? (lsGet(LS.branch) || '') : S.user.branch;
         if (S.branch && !branchNames().includes(S.branch)) S.branch = '';
         renderApp();
