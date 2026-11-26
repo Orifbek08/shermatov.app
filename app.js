@@ -123,7 +123,25 @@ function payTypes() { return (S.cfg && S.cfg.payTypes) || []; }
 function payKind(name) { const p = payTypes().find((x) => x.name === name); return p ? p.kind : ''; }
 function payIcon(kind) { return { cash: 'cash', card: 'card', transfer: 'bank', debt: 'debt' }[kind] || 'wallet'; }
 function moneyPays() { return payTypes().filter((p) => p.kind !== 'debt'); }
-function payTag(name) { return name ? `<span class="ptag k-${payKind(name) || 'none'}">${ic(payIcon(payKind(name)))}${esc(name)}</span>` : ''; }
+function payTag1(name) { return name ? `<span class="ptag k-${payKind(name) || 'none'}">${ic(payIcon(payKind(name)))}${esc(name)}</span>` : ''; }
+/** «Нақд + Карта» каби ёрлиқ — ҳар бир тур алоҳида белги */
+function payTag(name) { return name ? String(name).split(' + ').map(payTag1).join('') : ''; }
+/** Чекдаги қарз қисми (бўлиб тўланган бўлса — фақат қарз қисми) */
+function debtPart(g) {
+  if (g.pays && g.pays.length) return g.pays.filter((p) => payKind(p.pay) === 'debt' || p.kind === 'debt').reduce((a, p) => a + Number(p.amount || 0), 0);
+  return payKind(g.pay) === 'debt' ? g.sum - g.disc : 0;
+}
+function salePays(f) {
+  if (!f.split) return f.pay ? [{ pay: f.pay, amount: null }] : [];
+  return payTypes().filter((p) => num(f.parts[p.name]) > 0).map((p) => ({ pay: p.name, amount: num(f.parts[p.name]) }));
+}
+function saleHasDebt(f) {
+  return f.split ? payTypes().some((p) => p.kind === 'debt' && num(f.parts[p.name]) > 0) : payKind(f.pay) === 'debt';
+}
+function saleNet(f) {
+  const sum = f.lines.filter((l) => l.product).reduce((a, l) => a + num(l.sum), 0);
+  return Math.max(0, sum - (f.disc ? num(f.discSum) : 0));
+}
 function product(name) { return (S.cfg.products || []).find((p) => p.name === name); }
 function stockOf(branch, prod) { return (S.stock[branch] && S.stock[branch][prod]) || 0; }
 function branchNames() { return (S.cfg.branches || []).map((b) => b.name); }
@@ -428,7 +446,7 @@ function form(id) {
   if (!S.forms[id]) {
     const p0 = (moneyPays()[0] || payTypes()[0] || {}).name || '';
     S.forms[id] = { lines: [newLine()], client: '', doctor: '', note: '', to: '', rid: uid(), busy: false,
-      pay: p0, debtNote: '', due: '', disc: false, discSum: '', discNote: '' };
+      pay: p0, debtNote: '', due: '', disc: false, discSum: '', discNote: '', split: false, parts: {} };
   }
   return S.forms[id];
 }
@@ -491,10 +509,22 @@ function updateTotals(kind) {
   if (kind === 'sale') {
     const sum = act.reduce((a, l) => a + num(l.sum), 0);
     const disc = f.disc ? num(f.discSum) : 0;
-    const debt = payKind(f.pay) === 'debt';
-    const cap = $('#co-cap'); if (cap) cap.textContent = debt ? 'Қарзга ёзилади' : 'Мижоз тўлайди';
-    const co = $('.checkout'); if (co) co.classList.toggle('debt', debt);
-    el.innerHTML = `<b class="amt">${fmt(Math.max(0, sum - disc))}<small>${cur()}</small></b><span class="sub">${disc ? `${fmt(sum)} − чегирма ${fmt(disc)} · ` : ''}${fmt(qty)} дона, ${kinds} хил${f.pay ? ' · ' + esc(f.pay) : ''}</span>`;
+    const net = Math.max(0, sum - disc);
+    const parts = salePays(f);
+    const fullDebt = !f.split ? payKind(f.pay) === 'debt' : (parts.length === 1 && payKind(parts[0].pay) === 'debt');
+    const cap = $('#co-cap'); if (cap) cap.textContent = fullDebt ? 'Қарзга ёзилади' : 'Мижоз тўлайди';
+    const co = $('.checkout'); if (co) co.classList.toggle('debt', fullDebt);
+    const payTxt = f.split ? parts.map((p) => `${esc(p.pay)} ${fmt(p.amount)}`).join(' + ') : esc(f.pay || '');
+    el.innerHTML = `<b class="amt">${fmt(net)}<small>${cur()}</small></b><span class="sub">${disc ? `${fmt(sum)} − чегирма ${fmt(disc)} · ` : ''}${fmt(qty)} дона, ${kinds} хил${payTxt ? ' · ' + payTxt : ''}</span>`;
+    if (f.split) {
+      const left = net - parts.reduce((a, p) => a + p.amount, 0);
+      const sl = $('#sp-left');
+      if (sl) {
+        sl.className = 'sp-left ' + (left === 0 ? 'ok' : left > 0 ? 'need' : 'over');
+        sl.innerHTML = left === 0 ? `${ic('check')}Тўлиқ тақсимланди` : left > 0 ? `Яна <b>${fmt(left)}</b> тақсимланг` : `<b>${fmt(-left)}</b> ортиқча ёзилди`;
+      }
+    }
+    const db = $('#debt-box'); if (db) db.classList.toggle('hidden', !saleHasDebt(f));
   } else {
     el.innerHTML = `<b class="amt">${fmt(qty)}<small>дона</small></b><span class="sub">${kinds} хил маҳсулот</span>`;
   }
@@ -534,11 +564,19 @@ function viewSale() {
 }
 
 function payBlockHTML(f) {
-  const debt = payKind(f.pay) === 'debt';
+  const debt = saleHasDebt(f);
   return `<div class="payblock">
-    <div class="pb-row">
+    <div class="pb-row ${f.split ? 'hidden' : ''}" id="pay-one">
       <span class="pb-cap">Тўлов тури</span>
       <div class="chips" role="radiogroup" aria-label="Тўлов тури">${payTypes().map((p) => `<button type="button" class="chip k-${p.kind} ${f.pay === p.name ? 'on' : ''}" data-act="pay" data-v="${esc(p.name)}" role="radio" aria-checked="${f.pay === p.name}">${ic(payIcon(p.kind))}${esc(p.name)}</button>`).join('')}</div>
+    </div>
+    <button type="button" class="switch split-sw ${f.split ? 'on' : ''}" data-act="split" role="switch" aria-checked="${f.split}"><i></i>${ic('wallet')}Бўлиб тўлаш <small>нақд + карта, карта + қарз ...</small></button>
+    <div class="subbox split-box ${f.split ? '' : 'hidden'}" id="split-box">
+      ${payTypes().map((p) => `<div class="sp-row">
+        <button type="button" class="sp-l k-${p.kind}" data-act="sp-fill" data-v="${esc(p.name)}" title="Қолган суммани шу турга ёзиш">${ic(payIcon(p.kind))}<span>${esc(p.name)}</span></button>
+        <input class="money" data-sp="${esc(p.name)}" inputmode="numeric" value="${num(f.parts[p.name]) ? fmt(f.parts[p.name]) : ''}" placeholder="0" autocomplete="off" aria-label="${esc(p.name)} суммаси">
+      </div>`).join('')}
+      <div class="sp-left" id="sp-left" aria-live="polite"></div>
     </div>
     <div class="subbox debt-box ${debt ? '' : 'hidden'}" id="debt-box">
       <label class="field grow"><span>Қарз изоҳи <b class="req" title="Мажбурий">*</b></span><input data-ff="debtNote" value="${esc(f.debtNote)}" placeholder="Телефони, қачон тўлашини айтди ва ҳ.к." autocomplete="off"></label>
@@ -684,7 +722,7 @@ function groupDocs(rows) {
     if (!g) {
       g = { doc: r.doc, date: r.date, time: r.time, type: r.type, branch: r.branch, to: r.to, client: r.client,
         doctor: r.doctor, op: r.op, note: r.note, status: r.status, ref: r.ref || '', pay: r.pay || '',
-        disc: Number(r.disc) || 0, discNote: r.discNote || '', opPhone: r.opPhone || '', lines: [], sum: 0, qty: 0 };
+        disc: Number(r.disc) || 0, discNote: r.discNote || '', opPhone: r.opPhone || '', pays: r.pays || [], lines: [], sum: 0, qty: 0 };
       m.set(r.doc, g);
     }
     g.lines.push(r);
@@ -733,7 +771,7 @@ function sideHTML(kind) {
     const rets = groupDocs(S.today.filter((r) => r.type === T.RET && r.status !== CANCEL && (!S.branch || r.branch === S.branch)));
     const retSum = rets.reduce((a, d) => a + d.sum, 0);
     const gross = act.reduce((a, d) => a + d.sum - d.disc, 0);
-    const debtSum = act.filter((d) => payKind(d.pay) === 'debt').reduce((a, d) => a + d.sum - d.disc, 0);
+    const debtSum = act.reduce((a, d) => a + debtPart(d), 0);
     stats = `<div class="feed-stats">
       <div class="fs-main"><small>Тушум${retSum ? ' (соф)' : ''}</small><b>${fmt(gross - retSum)}</b><small>${cur()}</small>${retSum ? `<em>қайтариш −${fmt(retSum)}</em>` : ''}${debtSum ? `<em class="dbt">шундан қарзга ${fmt(debtSum)}</em>` : ''}</div>
       <div><small>Чеклар</small><b>${act.length}</b></div>
@@ -769,6 +807,11 @@ function onViewInput(e) {
     return;
   }
   const f = form(kind);
+  if (t.dataset.sp != null) {
+    f.parts[t.dataset.sp] = num(t.value);
+    updateTotals(kind);
+    return;
+  }
   if (t.dataset.ff) {
     f[t.dataset.ff] = t.dataset.ff === 'discSum' ? num(t.value) : t.value;
     if (t.dataset.ff === 'discSum') { updateTotals(kind); return; }
@@ -821,7 +864,7 @@ function onViewBlur(e) {
     if (l && l.product) t.value = l.product;
     else if (t.value.trim()) t.classList.add('bad');
   }
-  if (t.dataset && (t.dataset.f === 'price' || t.dataset.f === 'sum' || t.dataset.ff === 'discSum') && t.value !== '') t.value = fmt(num(t.value));
+  if (t.dataset && (t.dataset.f === 'price' || t.dataset.f === 'sum' || t.dataset.ff === 'discSum' || t.dataset.sp != null) && t.value !== '') t.value = fmt(num(t.value));
 }
 
 async function onViewClick(e) {
@@ -854,6 +897,24 @@ async function onViewClick(e) {
     const debt = payKind(f.pay) === 'debt';
     const box = $('#debt-box'); if (box) box.classList.toggle('hidden', !debt);
     if (debt) { const i = box.querySelector('input'); if (i) i.focus(); }
+    updateTotals('sale');
+  } else if (act === 'split') {
+    const f = form('sale');
+    f.split = !f.split;
+    if (f.split && !Object.values(f.parts).some((v) => num(v) > 0) && f.pay) f.parts = { [f.pay]: saleNet(f) };
+    b.classList.toggle('on', f.split); b.setAttribute('aria-checked', f.split);
+    $('#split-box').classList.toggle('hidden', !f.split);
+    $('#pay-one').classList.toggle('hidden', f.split);
+    document.querySelectorAll('[data-sp]').forEach((i) => { const v = num(f.parts[i.dataset.sp]); i.value = v ? fmt(v) : ''; });
+    if (f.split) { const i = document.querySelector('[data-sp]:not([data-sp="' + CSS.escape(f.pay) + '"])') || document.querySelector('[data-sp]'); if (i) i.focus(); }
+    updateTotals('sale');
+  } else if (act === 'sp-fill') {
+    const f = form('sale');
+    const name = b.dataset.v;
+    const others = payTypes().filter((p) => p.name !== name).reduce((a, p) => a + num(f.parts[p.name]), 0);
+    f.parts[name] = Math.max(0, saleNet(f) - others);
+    const i = document.querySelector(`[data-sp="${CSS.escape(name)}"]`);
+    if (i) { i.value = f.parts[name] ? fmt(f.parts[name]) : ''; i.focus(); }
     updateTotals('sale');
   } else if (act === 'disc') {
     const f = form('sale');
@@ -963,14 +1024,23 @@ async function submit(kind) {
     payload.client = f.client; payload.doctor = f.doctor;
     payload.items = lines.map((l) => ({ product: l.product, qty: num(l.qty), price: num(l.price) }));
     const total = lines.reduce((a, l) => a + num(l.sum), 0);
-    if (!f.pay) return toast('Тўлов турини танланг', 'err');
+    if (!f.split && !f.pay) return toast('Тўлов турини танланг', 'err');
     payload.pay = f.pay;
+    if (f.split) {
+      const parts = salePays(f);
+      const net = total - (f.disc ? num(f.discSum) : 0);
+      const got = parts.reduce((a, p) => a + p.amount, 0);
+      if (!parts.length) return toast('Бўлиб тўлашда суммаларни ёзинг', 'err');
+      if (got !== net) return toast(got < net ? `Яна ${fmt(net - got)} тақсимланг — жами ${fmt(net)} бўлиши керак` : `${fmt(got - net)} ортиқча ёзилди — жами ${fmt(net)} бўлиши керак`, 'err');
+      payload.pays = parts.map((p) => ({ pay: p.pay, amount: String(p.amount) }));
+      payload.pay = parts[0].pay;
+    }
     if (f.disc && num(f.discSum) > 0) {
       if (num(f.discSum) > total) return toast(`Чегирма сотув суммасидан (${fmt(total)}) катта бўлмасин`, 'err');
       if (!f.discNote.trim()) { toast('Чегирма сабабини ёзинг', 'err'); const i = $('[data-ff="discNote"]'); if (i) i.focus(); return; }
       payload.discount = String(num(f.discSum)); payload.discountNote = f.discNote;
     }
-    if (payKind(f.pay) === 'debt') {
+    if (saleHasDebt(f)) {
       if (!f.debtNote.trim()) { toast('Қарз учун изоҳ ёзинг: телефони, қачон тўлайди', 'err'); const i = $('[data-ff="debtNote"]'); if (i) i.focus(); return; }
       payload.debtNote = f.debtNote; payload.due = f.due;
     }
@@ -1048,7 +1118,7 @@ const BIO_QR = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 33 33" sh
 function receiptHTML(g) {
   const br = (S.cfg.branches || []).find((b) => b.name === g.branch) || {};
   const net = g.sum - g.disc;
-  const debt = payKind(g.pay) === 'debt';
+  const debt = debtPart(g) >= net && net > 0;
   const phone = g.opPhone || (g.op === S.user.name ? S.user.phone : '') || '';
   const items = g.lines.map((l) => `<div class="rc-it"><div class="rc-nm">${esc(l.product)}</div>
     <div class="rc-r"><span>${fmt(l.qty)} × ${fmt(l.price)}</span><b>${fmt(l.sum)}</b></div></div>`).join('');
@@ -1068,7 +1138,9 @@ function receiptHTML(g) {
     <div class="rc-line"></div>
     ${g.disc ? `<div class="rc-kv"><span>Жами</span><b>${fmt(g.sum)}</b></div><div class="rc-kv"><span>Чегирма</span><b>−${fmt(g.disc)}</b></div>` : ''}
     <div class="rc-kv rc-tot"><span>${debt ? 'ҚАРЗГА' : 'ТЎЛОВ'}</span><b>${fmt(net)} ${esc(cur())}</b></div>
-    ${g.pay ? `<div class="rc-kv"><span>Тўлов тури</span><b>${esc(g.pay)}</b></div>` : ''}
+    ${g.pays && g.pays.length > 1
+      ? g.pays.map((p) => `<div class="rc-kv"><span>${payKind(p.pay) === 'debt' || p.kind === 'debt' ? 'Қарзга' : esc(p.pay)}</span><b>${fmt(p.amount)}</b></div>`).join('')
+      : g.pay ? `<div class="rc-kv"><span>Тўлов тури</span><b>${esc(g.pay)}</b></div>` : ''}
     <div class="rc-line"></div>
     <div class="rc-kv"><span>Кассир</span><b>${esc(g.op)}</b></div>
     ${phone ? `<div class="rc-kv"><span>Кассир тел.</span><b>${esc(phone)}</b></div>` : ''}
@@ -1207,7 +1279,7 @@ function retTotals() {
     qty += q;
     sum += r.manual[l.id] ? (r.sums[l.id] || 0) : retDefSum(l, q);
   });
-  const debt = payKind(r.sel.pay) === 'debt';
+  const debt = (r.sel.pays || []).some((p) => p.kind === 'debt') || payKind(r.sel.pay) === 'debt';
   el.innerHTML = `<b class="amt">${fmt(sum)}<small>${cur()}</small></b><span class="sub">${fmt(qty)} дона «${esc(r.sel.branch)}» қолдиғига қайтади${debt ? ' · аввал қарздан айрилади' : ''}${Number(r.sel.discount) ? ' · чегирма ҳисобга олинган' : ''}</span>`;
 }
 
@@ -1291,7 +1363,7 @@ async function retSubmit() {
   const total = items.reduce((a, x) => a + x.sum, 0);
   if (!(await modal({
     title: 'Қайтаришни тасдиқланг',
-    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади${payKind(r.sel.pay) === 'debt' ? `. Сумма <b>${money(total)}</b> — аввал мижознинг қарзидан айрилади, қарздан ортгани пул қилиб қайтарилади` : `. Мижозга <b>${money(total)}</b> қайтарасиз`}. Маҳсулот <b>${esc(r.sel.branch)}</b> қолдиғига қўшилади.`,
+    body: `<b>${esc(r.sel.doc)}</b> чекидан ${fmt(items.reduce((a, x) => a + x.qty, 0))} дона қайтарилади${(r.sel.pays || []).some((p) => p.kind === 'debt') || payKind(r.sel.pay) === 'debt' ? `. Сумма <b>${money(total)}</b> — аввал мижознинг қарзидан айрилади, қарздан ортгани пул қилиб қайтарилади` : `. Мижозга <b>${money(total)}</b> қайтарасиз`}. Маҳсулот <b>${esc(r.sel.branch)}</b> қолдиғига қўшилади.`,
     ok: 'Қайтариш',
   }))) return;
   r.busy = true; renderRet();
